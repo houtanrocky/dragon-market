@@ -2,5 +2,6 @@
 <project version="4">
   <component name="DataSourcePerFileMappings">
     <file url="file://$PROJECT_DIR$/migrations/000001_create_guilds_table.up.sql" value="7a6cdefd-418d-45a5-bfe3-211a93aabbb4" />
+    <file url="file://$PROJECT_DIR$/migrations/000002_add_daily_fields_to_guilds.up.sql" value="7a6cdefd-418d-45a5-bfe3-211a93aabbb4" />
   </component>
 </project>

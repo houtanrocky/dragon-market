@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/internal/postgres/guild_repo.go" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/internal/postgres/guild_repo_test.go" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/migrations/000001_create_guilds_table.up.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/migrations/000002_add_daily_fields_to_guilds.up.sql" dialect="PostgreSQL" />
   </component>
 </project>
