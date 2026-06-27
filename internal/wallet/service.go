@@ -1,13 +1,15 @@
 package wallet
 
 import (
+	"context"
 	"fmt"
 	"market-dragon/internal/models"
 )
 
 type GuildRepository interface {
-	Get(id string) (*models.Guild, error)
-	Update(val *models.Guild) (*models.Guild, error)
+	Get(ctx context.Context, id string) (*models.Guild, error)
+	Update(ctx context.Context, val *models.Guild) (*models.Guild, error)
+	RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
 type Service struct {
