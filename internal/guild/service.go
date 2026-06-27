@@ -1,4 +1,4 @@
-package wallet
+package guild
 
 import (
 	"context"
@@ -6,10 +6,10 @@ import (
 )
 
 type WalletService struct {
-	guildRepository GuildRepository
+	guildRepository Repository
 }
 
-func NewWalletService(r GuildRepository) *WalletService {
+func NewWalletService(r Repository) *WalletService {
 	return &WalletService{guildRepository: r}
 }
 

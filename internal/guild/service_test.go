@@ -1,21 +1,20 @@
-package wallet
+package guild
 
 import (
 	"context"
 	"errors"
-	"market-dragon/internal/domain/wallet/models"
 	"testing"
 )
 
 type MockGuildRepo struct {
-	guilds map[string]*models.Guild
+	guilds map[string]*Guild
 }
 
 func (m *MockGuildRepo) RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
 	return fn(ctx)
 }
 
-func (m *MockGuildRepo) Get(ctx context.Context, id string) (*models.Guild, error) {
+func (m *MockGuildRepo) Get(ctx context.Context, id string) (*Guild, error) {
 	g, ok := m.guilds[id]
 	if !ok {
 		return nil, errors.New("g not found")
@@ -23,7 +22,7 @@ func (m *MockGuildRepo) Get(ctx context.Context, id string) (*models.Guild, erro
 	return g, nil
 }
 
-func (m *MockGuildRepo) Update(ctx context.Context, g *models.Guild) error {
+func (m *MockGuildRepo) Update(ctx context.Context, g *Guild) error {
 	m.guilds[g.ID] = g
 
 	return nil
@@ -38,7 +37,7 @@ func TestWallet_Service_Reserve_Success(t *testing.T) {
 		testReserveAmount   = testInitialReserve + excessReserveAmount
 		testExpectedReserve = testInitialReserve + testReserveAmount
 	)
-	repo := MockGuildRepo{guilds: map[string]*models.Guild{
+	repo := MockGuildRepo{guilds: map[string]*Guild{
 		testGuildID: {
 			ID:       testGuildID,
 			Gold:     testInitialGold,
@@ -69,7 +68,7 @@ func TestWallet_Service_Reserve_Insufficient(t *testing.T) {
 		testReserveAmount   = testInitialReserve + excessReserveAmount
 		testExpectedReserve = testInitialReserve
 	)
-	repo := MockGuildRepo{guilds: map[string]*models.Guild{
+	repo := MockGuildRepo{guilds: map[string]*Guild{
 		testGuildID: {
 			ID:       testGuildID,
 			Gold:     testInitialGold,
@@ -103,7 +102,7 @@ func TestWallet_Service_Deduct_Success(t *testing.T) {
 		testExpectedGold         = testInitialGold - testDeductAmount
 		testExpectedReserve      = testInitialReserve
 	)
-	repo := MockGuildRepo{guilds: map[string]*models.Guild{
+	repo := MockGuildRepo{guilds: map[string]*Guild{
 		"guild-1": {
 			ID:       testGuildID,
 			Gold:     testInitialGold,
@@ -143,7 +142,7 @@ func TestWallet_Service_Deduct_Fail(t *testing.T) {
 		testExpectedGold         = testInitialGold
 		testExpectedReserve      = testInitialReserve
 	)
-	repo := MockGuildRepo{guilds: map[string]*models.Guild{
+	repo := MockGuildRepo{guilds: map[string]*Guild{
 		"guild-1": {
 			ID:       testGuildID,
 			Gold:     testInitialGold,
@@ -182,7 +181,7 @@ func TestWallet_Service_Release_Success(t *testing.T) {
 		testExpectedGold    = testInitialGold
 		testExpectedReserve = testInitialReserve - testReleaseAmount
 	)
-	repo := MockGuildRepo{guilds: map[string]*models.Guild{
+	repo := MockGuildRepo{guilds: map[string]*Guild{
 		"guild-1": {
 			ID:       testGuildID,
 			Gold:     testInitialGold,
@@ -222,7 +221,7 @@ func TestWallet_Service_Release_Insufficient(t *testing.T) {
 		testExpectedGold         = testInitialGold
 		testExpectedReserve      = testInitialReserve
 	)
-	repo := MockGuildRepo{guilds: map[string]*models.Guild{
+	repo := MockGuildRepo{guilds: map[string]*Guild{
 		"guild-1": {
 			ID:       testGuildID,
 			Gold:     testInitialGold,
