@@ -60,7 +60,7 @@ func (r *Repository) RunInTransaction(ctx context.Context, fn func(ctx context.C
 	err = fn(txCtx)
 	if err != nil {
 		_ = tx.Rollback()
-		panic(err)
+		return err
 	}
 	return tx.Commit()
 }
