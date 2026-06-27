@@ -9,10 +9,12 @@ import (
 	"testing"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/testcontainers/testcontainers-go/wait"
-
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
+
+var testDB *sql.DB
+var testContainer testcontainers.Container
 
 func LoadMigration(filename string) (string, error) {
 	data, err := os.ReadFile(filepath.Join("../../migrations", filename))
@@ -22,8 +24,10 @@ func LoadMigration(filename string) (string, error) {
 	return string(data), nil
 }
 
-func setupTestDB(t *testing.T) (*sql.DB, func()) {
+// TestMain runs once, sets up container with schema
+func TestMain(m *testing.M) {
 	ctx := context.Background()
+
 	req := testcontainers.ContainerRequest{
 		Image: "postgres:16-alpine",
 		Env: map[string]string{
@@ -36,34 +40,60 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 			wait.ForListeningPort("5432/tcp"),
 		),
 	}
+
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 	})
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
+	testContainer = container
 
-	host, _ := container.Host(ctx)
-	port, _ := container.MappedPort(ctx, "5432")
+	host, err := container.Host(ctx)
+	if err != nil {
+		panic(err)
+	}
+	port, err := container.MappedPort(ctx, "5432")
+	if err != nil {
+		panic(err)
+	}
 	dsn := fmt.Sprintf("postgres://test:test@%s:%s/test?sslmode=disable", host, port.Port())
-	db, err := sql.Open("pgx", dsn)
+
+	testDB, err = sql.Open("pgx", dsn)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
-	sqlMigration, err := LoadMigration("000001_create_guilds_table.up.sql")
-	if err != nil {
-		t.Fatal(err)
+	// Load migrations ONCE
+	migrations := []string{
+		"000001_create_guilds_table.up.sql",
+		"000002_add_daily_fields_to_guilds.up.sql",
 	}
 
-	// Run migration/s
-	_, err = db.Exec(sqlMigration)
-	if err != nil {
-		t.Fatal(err)
+	for _, migFile := range migrations {
+		sql, err := LoadMigration(migFile)
+		if err != nil {
+			panic(err)
+		}
+		if _, err := testDB.ExecContext(ctx, sql); err != nil {
+			panic(err)
+		}
 	}
 
-	return db, func() { db.Close(); container.Terminate(ctx) }
+	code := m.Run()
+
+	testDB.Close()
+	testContainer.Terminate(ctx)
+	os.Exit(code)
+}
+
+// Setup for each test - clean state
+func setupTest(t *testing.T, ctx context.Context) {
+	// Truncate tables before each test
+	if _, err := testDB.ExecContext(ctx, "TRUNCATE guilds CASCADE"); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestGuildRepository_GetAndUpdate(t *testing.T) {
@@ -74,37 +104,44 @@ func TestGuildRepository_GetAndUpdate(t *testing.T) {
 		testAddedGold      = 10
 		testExpectedGold   = testInitialGold + testAddedGold
 	)
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
 
-	repo := NewRepository(db)
 	ctx := context.Background()
+	setupTest(t, ctx)
 
-	// insert a guild
-	_, err := db.ExecContext(ctx, `INSERT INTO guilds (id, gold, reserved) VALUES ($1, $2, $3)`, testInitialGuildID, testInitialGold, testInitialReserve)
+	repo := NewRepository(testDB)
+
+	// Insert
+	_, err := testDB.ExecContext(
+		ctx,
+		`INSERT INTO guilds (id, gold, reserved) VALUES ($1, $2, $3)`,
+		testInitialGuildID, testInitialGold, testInitialReserve,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// test get
+	// Test Get
 	g, err := repo.Get(ctx, testInitialGuildID)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if g.Gold != testInitialGold || g.Reserved != testInitialReserve {
 		t.Errorf("unexpected values %+v", g)
 	}
 
-	// test update
+	// Test Update
 	g.Gold = testExpectedGold
-	err = repo.Update(ctx, g)
-	if err != nil {
+	if err := repo.Update(ctx, g); err != nil {
 		t.Fatal(err)
 	}
 
-	var gold float64
-	db.QueryRowContext(ctx, `SELECT gold FROM guilds WHERE id = $1`, testInitialGuildID).Scan(&gold)
-	if gold != testExpectedGold {
-		t.Errorf("expected gold %v, got %v", testExpectedGold, gold)
+	// Verify update
+	updated, err := repo.Get(ctx, testInitialGuildID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Gold != testExpectedGold {
+		t.Errorf("expected gold %v, got %v", testExpectedGold, updated.Gold)
 	}
 }

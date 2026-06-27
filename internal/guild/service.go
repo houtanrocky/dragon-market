@@ -2,6 +2,7 @@ package guild
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -17,6 +18,9 @@ func (s *WalletService) Reserve(ctx context.Context, id string, amount float64) 
 	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
+		if errors.Is(err, ErrGuildNotFound) {
+			return fmt.Errorf("guild %s does not exist: %w", id, err)
+		}
 		if err != nil {
 			return err
 		}
@@ -34,6 +38,9 @@ func (s *WalletService) Deduct(ctx context.Context, id string, amount float64) e
 	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
+		if errors.Is(err, ErrGuildNotFound) {
+			return fmt.Errorf("guild %s does not exist: %w", id, err)
+		}
 		if err != nil {
 			return err
 		}
@@ -52,6 +59,9 @@ func (s *WalletService) Release(ctx context.Context, id string, amount float64) 
 	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
+		if errors.Is(err, ErrGuildNotFound) {
+			return fmt.Errorf("guild %s does not exist: %w", id, err)
+		}
 		if err != nil {
 			return err
 		}
