@@ -13,8 +13,6 @@ func TestItemRepository_GetByID(t *testing.T) {
 		testInitialGuildID = "guild-1"
 		testInitialGold    = 200
 		testInitialReserve = 100
-		testAddedGold      = 10
-		testExpectedGold   = testInitialGold + testAddedGold
 	)
 	const (
 		testItemInitialID        = "item-1"
@@ -25,7 +23,7 @@ func TestItemRepository_GetByID(t *testing.T) {
 		testItemInitialBasePrice = 1000
 	)
 	ctx := context.Background()
-	if err := TruncateTables(ctx, "items"); err != nil {
+	if err := TruncateTables(ctx, "items", "guilds"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -87,7 +85,7 @@ func TestItemRepository_ListAvailable(t *testing.T) {
 		},
 	}
 	ctx := context.Background()
-	if err := TruncateTables(ctx, "items"); err != nil {
+	if err := TruncateTables(ctx, "items", "guilds"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -137,7 +135,98 @@ func TestItemRepository_ListAvailable(t *testing.T) {
 	}
 }
 
-func TestItemRepository_Update(t *testing.T) {
-	// ---------- Arrange -----------------------
+func TestItemRepository_GetAndUpdate(t *testing.T) {
+	// ----------- Arrange ------------
+	const (
+		testInitialGuildID = "guild-1"
+		testInitialGold    = 200
+		testInitialReserve = 100
+	)
+	const (
+		testItemInitialID        = "item-1"
+		testItemInitialName      = "Sassy Sword"
+		testItemInitialType      = item.Common
+		testItemInitialOwner     = testInitialGuildID
+		testItemInitialAvailable = true
+		testItemInitialBasePrice = 1000
+
+		testItemExpectedName      = "Brave Sword"
+		testItemExpectedType      = item.Rare
+		testItemExpectedOwner     = "guild-2"
+		testItemExpectedAvailable = false
+		testItemExpectedBasePrice = 299.0
+	)
+
+	ctx := context.Background()
+	if err := TruncateTables(ctx, "items", "guilds"); err != nil {
+		t.Fatal(err)
+	}
+
+	// ---- Insert a guild (guild-1) ----
+	repo := NewItemRepository(testDB)
+	_, err := testDB.ExecContext(
+		ctx,
+		`INSERT INTO guilds (id, gold, reserved) VALUES ($1, $2, $3)`,
+		testInitialGuildID, testInitialGold, testInitialReserve,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// ---- Insert a guild (guild-2) ----
+	_, err = testDB.ExecContext(
+		ctx,
+		`INSERT INTO guilds (id, gold, reserved) VALUES ($1, $2, $3)`,
+		"guild-2", testInitialGold, testInitialReserve,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// ---- Insert an item ----
+	_, err = testDB.ExecContext(ctx,
+		`INSERT INTO items (id, name, type, owner_id, available, base_price)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		testItemInitialID, testItemInitialName, testItemInitialType, testItemInitialOwner,
+		testItemInitialAvailable, testItemInitialBasePrice)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	it, err := repo.GetByID(ctx, testItemInitialID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// ---------- Act ------------------------
+	// Test Update
+	it.Name = testItemExpectedName
+	it.Type = testItemExpectedType
+	it.BasePrice = testItemExpectedBasePrice
+	it.OwnerID = testItemExpectedOwner
+	it.Available = testItemExpectedAvailable
+
+	err = repo.Update(ctx, it)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Get updated item
+	updated, err := repo.GetByID(ctx, it.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// ---------- Assert ---------------------
+	if updated.Name != testItemExpectedName {
+		t.Errorf("expected Name=%s, got %s", testItemExpectedName, updated.Name)
+	}
+	if updated.Type != testItemExpectedType {
+		t.Errorf("expected Type=%s, got %s", testItemExpectedType, updated.Type)
+	}
+	if updated.OwnerID != testItemExpectedOwner {
+		t.Errorf("expected OwnerID=%s, got %s", testItemExpectedOwner, updated.OwnerID)
+	}
+	if updated.Available != testItemExpectedAvailable {
+		t.Errorf("expected Available=%v, got %v", testItemExpectedAvailable, updated.Available)
+	}
+	if updated.BasePrice != testItemExpectedBasePrice {
+		t.Errorf("expected BasePrice=%.2f, got %.2f", testItemExpectedBasePrice, updated.BasePrice)
+	}
 
 }
