@@ -219,7 +219,7 @@ func TestWallet_Service_Deduct_Success(t *testing.T) {
 
 		testDeductAmount    = testInitialAvailableGold + excessDeductAmount
 		testExpectedGold    = testInitialGold - testDeductAmount
-		testExpectedReserve = testInitialReserve
+		testExpectedReserve = testInitialReserve - testDeductAmount
 	)
 	repo := MockGuildRepo{guilds: map[string]*Guild{
 		"guild-1": {
