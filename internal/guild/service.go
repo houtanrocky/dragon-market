@@ -53,7 +53,10 @@ func (s *WalletService) Deduct(ctx context.Context, id string, amount float64) e
 		if available < amount {
 			return fmt.Errorf("insufficient available balance: have: %v need: %v", available, amount)
 		}
-
+		if g.Reserved < amount {
+			return fmt.Errorf("cannot deduct, only %v is reserved, need %v", g.Reserved, amount)
+		}
+		g.Reserved -= amount
 		g.Gold -= amount
 		return repo.Update(ctx, g)
 	})
