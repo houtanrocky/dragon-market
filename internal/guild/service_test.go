@@ -17,7 +17,7 @@ func (m *MockGuildRepo) RunInTransaction(ctx context.Context, fn func(ctx contex
 func (m *MockGuildRepo) Get(ctx context.Context, id string) (*Guild, error) {
 	g, ok := m.guilds[id]
 	if !ok {
-		return nil, errors.New("g not found")
+		return nil, errors.New("guild not found")
 	}
 	return g, nil
 }
@@ -30,11 +30,11 @@ func (m *MockGuildRepo) Update(ctx context.Context, g *Guild) error {
 
 func TestWallet_Service_Reserve_Success(t *testing.T) {
 	const (
-		testGuildID         = "guild-1"
-		testInitialGold     = 200
-		testInitialReserve  = 100
-		excessReserveAmount = 0
-		testReserveAmount   = testInitialReserve + excessReserveAmount
+		testGuildID        = "guild-1"
+		testInitialGold    = 200
+		testInitialReserve = 100
+
+		testReserveAmount   = 100
 		testExpectedReserve = testInitialReserve + testReserveAmount
 	)
 	repo := MockGuildRepo{guilds: map[string]*Guild{
@@ -61,11 +61,12 @@ func TestWallet_Service_Reserve_Success(t *testing.T) {
 
 func TestWallet_Service_Reserve_Insufficient(t *testing.T) {
 	const (
-		testGuildID         = "guild-1"
-		testInitialGold     = 200
-		testInitialReserve  = 100
-		excessReserveAmount = 1
-		testReserveAmount   = testInitialReserve + excessReserveAmount
+		testGuildID        = "guild-1"
+		testInitialGold    = 200
+		testInitialReserve = 100
+		exessiveReserve    = 1
+
+		testReserveAmount   = testInitialGold - testInitialReserve + exessiveReserve
 		testExpectedReserve = testInitialReserve
 	)
 	repo := MockGuildRepo{guilds: map[string]*Guild{
@@ -98,9 +99,10 @@ func TestWallet_Service_Deduct_Success(t *testing.T) {
 		testInitialReserve       = 100
 		testInitialAvailableGold = testInitialGold - testInitialReserve
 		excessDeductAmount       = 0
-		testDeductAmount         = testInitialAvailableGold + excessDeductAmount
-		testExpectedGold         = testInitialGold - testDeductAmount
-		testExpectedReserve      = testInitialReserve
+
+		testDeductAmount    = testInitialAvailableGold + excessDeductAmount
+		testExpectedGold    = testInitialGold - testDeductAmount
+		testExpectedReserve = testInitialReserve
 	)
 	repo := MockGuildRepo{guilds: map[string]*Guild{
 		"guild-1": {
@@ -138,9 +140,10 @@ func TestWallet_Service_Deduct_Fail(t *testing.T) {
 		testInitialReserve       = 100
 		testInitialAvailableGold = testInitialGold - testInitialReserve
 		excessDeductAmount       = 1
-		testDeductAmount         = testInitialAvailableGold + excessDeductAmount
-		testExpectedGold         = testInitialGold
-		testExpectedReserve      = testInitialReserve
+
+		testDeductAmount    = testInitialAvailableGold + excessDeductAmount
+		testExpectedGold    = testInitialGold
+		testExpectedReserve = testInitialReserve
 	)
 	repo := MockGuildRepo{guilds: map[string]*Guild{
 		"guild-1": {
@@ -177,6 +180,7 @@ func TestWallet_Service_Release_Success(t *testing.T) {
 		testInitialGold     = 200
 		testInitialReserve  = 100
 		excessReleaseAmount = 0
+
 		testReleaseAmount   = testInitialReserve + excessReleaseAmount
 		testExpectedGold    = testInitialGold
 		testExpectedReserve = testInitialReserve - testReleaseAmount
@@ -217,9 +221,10 @@ func TestWallet_Service_Release_Insufficient(t *testing.T) {
 		testInitialReserve       = 100
 		testInitialAvailableGold = testInitialGold - testInitialReserve
 		excessReleaseAmount      = 1
-		testReleaseAmount        = testInitialAvailableGold + excessReleaseAmount
-		testExpectedGold         = testInitialGold
-		testExpectedReserve      = testInitialReserve
+
+		testReleaseAmount   = testInitialAvailableGold + excessReleaseAmount
+		testExpectedGold    = testInitialGold
+		testExpectedReserve = testInitialReserve
 	)
 	repo := MockGuildRepo{guilds: map[string]*Guild{
 		"guild-1": {
