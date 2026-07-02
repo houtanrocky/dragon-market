@@ -50,17 +50,3 @@ func (r *Repository) Update(ctx context.Context, val *guild.Guild) error {
 
 	return err
 }
-
-func (r *Repository) RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	txCtx := withTx(ctx, tx)
-	err = fn(txCtx)
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	return tx.Commit()
-}

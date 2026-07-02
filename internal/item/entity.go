@@ -8,11 +8,19 @@ const (
 	Legendary Type = "legendary"
 )
 
+type Status string
+
+const (
+	Free            Status = "free"
+	ListedInOrder   Status = "listed_in_order"
+	ListedInAuction Status = "listed_in_auction"
+)
+
 type Item struct {
 	ID        string
 	Name      string
 	Type      Type
 	OwnerID   string // guild ID
-	Available bool
+	Status    Status
 	BasePrice float64
 }

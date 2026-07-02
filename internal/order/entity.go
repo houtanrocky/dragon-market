@@ -15,7 +15,7 @@ type LimitOrder struct {
 	ID       string
 	ItemID   string
 	SellerID string
-	BuyerID  string
+	BuyerID  *string // nil until sold
 	Price    float64
 	Status   Status
 	ListedAt time.Time

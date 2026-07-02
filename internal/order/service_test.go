@@ -2,14 +2,35 @@ package order
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"market-dragon/internal/guild"
+	"market-dragon/internal/item"
 	"testing"
 	"time"
 )
 
-// ----------- MockOrderRepo -------------
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+// --- Mock Order Repo
 type MockOrderRepo struct {
 	orders map[string]*LimitOrder
+}
+
+func (r *MockOrderRepo) RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
+	return fn(ctx)
+}
+
+func (r *MockOrderRepo) GetOrdersByItemIDAndStatus(ctx context.Context, itemID string, status Status) ([]*LimitOrder, error) {
+
+	var orders []*LimitOrder
+	for _, order := range r.orders {
+		if order.ItemID == itemID && order.Status == status {
+			orders = append(orders, order)
+		}
+	}
+	return orders, nil
 }
 
 func (r *MockOrderRepo) Create(ctx context.Context, o *LimitOrder) error {
@@ -18,7 +39,11 @@ func (r *MockOrderRepo) Create(ctx context.Context, o *LimitOrder) error {
 }
 
 func (r *MockOrderRepo) GetByID(ctx context.Context, id string) (*LimitOrder, error) {
-	return r.orders[id], nil
+	o, ok := r.orders[id]
+	if !ok {
+		return nil, errors.New("order not found")
+	}
+	return o, nil
 }
 
 func (r *MockOrderRepo) Update(ctx context.Context, o *LimitOrder) error {
@@ -26,283 +51,328 @@ func (r *MockOrderRepo) Update(ctx context.Context, o *LimitOrder) error {
 	return nil
 }
 
-func (r *MockOrderRepo) RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
-	if err := fn(ctx); err != nil {
-		return err
-	}
-	return nil
-}
-
-// ----------- MockGuildRepo --------------
-type MockGuildRepo struct {
+// --- Mock Wallet Service
+type MockWalletService struct {
 	guilds map[string]*guild.Guild
 }
 
-func (m *MockGuildRepo) RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
-	return fn(ctx)
-}
-
-func (m *MockGuildRepo) Get(ctx context.Context, id string) (*guild.Guild, error) {
-	g, ok := m.guilds[id]
+func (s *MockWalletService) Spend(ctx context.Context, id string, amount float64) error {
+	g, ok := s.guilds[id]
 	if !ok {
-		return nil, guild.ErrGuildNotFound
+		return fmt.Errorf("guild not found")
 	}
-	return g, nil
-}
-
-func (m *MockGuildRepo) Update(ctx context.Context, g *guild.Guild) error {
-	m.guilds[g.ID] = g
-
+	if g.Gold < amount {
+		return fmt.Errorf("insufficient balance")
+	}
+	g.Gold -= amount
 	return nil
 }
 
-// ------------------------------------
-
-func TestService_List(t *testing.T) {
-	// Arrange
-
-	// -- ctx
-	ctx := context.Background()
-
-	const (
-		testGuildID           = "guild-1"
-		testInitialGold       = 200
-		testInitialReserve    = 100
-		testInitialDailyLimit = 200
-		testInitialDailySpent = 0
-	)
-
-	gRepo := &MockGuildRepo{
-		guilds: map[string]*guild.Guild{
-			testGuildID: {
-				ID:         testGuildID,
-				Gold:       testInitialGold,
-				Reserved:   testInitialReserve,
-				DailyLimit: testInitialDailyLimit,
-				DailySpent: testInitialDailySpent,
-			},
-		},
+func (s *MockWalletService) Earn(ctx context.Context, id string, amount float64) error {
+	g, ok := s.guilds[id]
+	if !ok {
+		return fmt.Errorf("guild not found")
 	}
+	g.Gold += amount
+	return nil
+}
 
-	// -- Order
-	const (
-		initialOrderID       = "o-1"
-		initialOrderItemID   = "user-1"
-		initialOrderSellerID = "seller-1"
-		initialOrderBuyerID  = "user-2"
-		initialOrderPrice    = 2000
-		initialOrderStatus   = Listed
-		initialListedEpoch   = 857174400
+// --- Mock Item Service
+type MockItemService struct {
+	items map[string]*item.Item
+}
 
-		initialOrderID2       = "o-10"
-		initialOrderItemID2   = "user-10"
-		initialOrderSellerID2 = "seller-10"
-		initialOrderBuyerID2  = "user-20"
-		initialOrderPrice2    = 4000
-		initialOrderStatus2   = Listed
-		initialListedEpoch2   = 857174422
-	)
-
-	oRepo := &MockOrderRepo{
-		orders: map[string]*LimitOrder{
-			//initialOrderID: {
-			//	ID:       initialOrderID,
-			//	ItemID:   initialOrderItemID,
-			//	SellerID: initialOrderSellerID,
-			//	BuyerID:  initialOrderBuyerID,
-			//	Price:    initialOrderPrice,
-			//	Status:   initialOrderStatus,
-			//	ListedAt: time.Unix(initialListedEpoch, 0).UTC(),
-			//},
-			//initialOrderID2: {
-			//	ID:       initialOrderID2,
-			//	ItemID:   initialOrderItemID2,
-			//	SellerID: initialOrderSellerID2,
-			//	BuyerID:  initialOrderBuyerID2,
-			//	Price:    initialOrderPrice2,
-			//	Status:   initialOrderStatus2,
-			//	ListedAt: time.Unix(initialListedEpoch2, 0).UTC(),
-			//},
-		},
+func (s *MockItemService) TransferOwnership(ctx context.Context, itemID string, guildId string) error {
+	i, ok := s.items[itemID]
+	if !ok {
+		return fmt.Errorf("item %v not found", itemID)
 	}
-
-	orders := map[string]*LimitOrder{
-		initialOrderID: {
-			ID:       initialOrderID,
-			ItemID:   initialOrderItemID,
-			SellerID: initialOrderSellerID,
-			BuyerID:  initialOrderBuyerID,
-			Price:    initialOrderPrice,
-			Status:   initialOrderStatus,
-			ListedAt: time.Unix(initialListedEpoch, 0).UTC(),
-		},
-		initialOrderID2: {
-			ID:       initialOrderID2,
-			ItemID:   initialOrderItemID2,
-			SellerID: initialOrderSellerID2,
-			BuyerID:  initialOrderBuyerID2,
-			Price:    initialOrderPrice2,
-			Status:   initialOrderStatus2,
-			ListedAt: time.Unix(initialListedEpoch2, 0).UTC(),
-		},
+	if i.OwnerID == guildId {
+		return fmt.Errorf("guild %v already owns %v", guildId, itemID)
 	}
+	i.OwnerID = guildId
+	return nil
+}
 
-	svc := NewOrderService(oRepo, gRepo)
+func (s *MockItemService) GetItem(ctx context.Context, itemID string) (*item.Item, error) {
+	i, ok := s.items[itemID]
+	if !ok {
+		return nil, fmt.Errorf("item %v not found", itemID)
+	}
+	return i, nil
+}
 
-	// Act
-	for _, o := range orders {
-		listedO, err := svc.List(ctx, o.ItemID, o.SellerID, o.Price)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Assert
-		if listedO.ItemID != listedO.ItemID {
-			t.Errorf("listed ItemID: %s, doesn't match: %s", listedO.ItemID, o.ItemID)
-		}
+func (s *MockItemService) UpdateItem(ctx context.Context, item *item.Item) error {
+	s.items[item.ID] = item
+	return nil
+}
 
+//func (r *MockItemRepo) ListAvailable(ctx context.Context) ([]*item.Item, error) {
+//	var result []*item.Item
+//	for _, it := range r.items {
+//		if it.Status != item.ListedInAuction {
+//			result = append(result, it)
+//		}
+//	}
+//	return result, nil
+//}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const (
+	sellerID = "seller-1"
+	buyerID  = "buyer-1"
+	itemID   = "item-1"
+	item2ID  = "item-2"
+	orderID  = "order-1"
+)
+
+func defaultGuilds() map[string]*guild.Guild {
+	return map[string]*guild.Guild{
+		sellerID: {ID: sellerID, Gold: 0},
+		buyerID:  {ID: buyerID, Gold: 10000, DailyLimit: 5000, DailySpent: 0},
 	}
 }
 
-func TestService_Buy(t *testing.T) {
-	ctx := context.Background()
-
-	const (
-		testGuildID           = "guild-1"
-		testInitialGold       = 200
-		testInitialReserve    = 100
-		testInitialDailyLimit = 200
-		testInitialDailySpent = 0
-	)
-
-	gRepo := &MockGuildRepo{
-		guilds: map[string]*guild.Guild{
-			testGuildID: {
-				ID:         testGuildID,
-				Gold:       testInitialGold,
-				Reserved:   testInitialReserve,
-				DailyLimit: testInitialDailyLimit,
-				DailySpent: testInitialDailySpent,
-			},
-		},
-	}
-
-	const (
-		initialOrderID       = "o-1"
-		initialOrderItemID   = "user-1"
-		initialOrderSellerID = "seller-1"
-		initialOrderBuyerID  = "user-2"
-		initialOrderPrice    = 2000
-		initialOrderStatus   = Listed
-		initialListedEpoch   = 857174400
-
-		initialOrderID2       = "o-10"
-		initialOrderItemID2   = "user-10"
-		initialOrderSellerID2 = "seller-10"
-		initialOrderBuyerID2  = "user-20"
-		initialOrderPrice2    = 4000
-		initialOrderStatus2   = Listed
-		initialListedEpoch2   = 857174422
-	)
-
-	oRepo := &MockOrderRepo{
-		orders: map[string]*LimitOrder{
-			initialOrderID: {
-				ID:       initialOrderID,
-				ItemID:   initialOrderItemID,
-				SellerID: initialOrderSellerID,
-				BuyerID:  initialOrderBuyerID,
-				Price:    initialOrderPrice,
-				Status:   initialOrderStatus,
-				ListedAt: time.Unix(initialListedEpoch, 0).UTC(),
-			},
-			initialOrderID2: {
-				ID:       initialOrderID2,
-				ItemID:   initialOrderItemID2,
-				SellerID: initialOrderSellerID2,
-				BuyerID:  initialOrderBuyerID2,
-				Price:    initialOrderPrice2,
-				Status:   initialOrderStatus2,
-				ListedAt: time.Unix(initialListedEpoch2, 0).UTC(),
-			},
-		},
-	}
-
-	svc := NewOrderService(oRepo, gRepo)
-
-	err := svc.Buy(ctx, initialOrderID, initialOrderBuyerID)
-	if err != nil {
-		t.Errorf("couldn't buy order id: %s, for buyer id: %s", initialOrderID, initialOrderBuyerID)
+func defaultItem() map[string]*item.Item {
+	return map[string]*item.Item{
+		itemID:  {ID: itemID, Name: "Sword", Type: item.Common, OwnerID: sellerID, Status: item.Free, BasePrice: 100},
+		item2ID: {ID: item2ID, Name: "Knife", Type: item.Common, OwnerID: sellerID, Status: item.Free, BasePrice: 100},
 	}
 }
 
-func TestService_Cancel(t *testing.T) {
+func listedOrder(price float64) *LimitOrder {
+	return &LimitOrder{
+		ID:       orderID,
+		ItemID:   itemID,
+		SellerID: sellerID,
+		Price:    price,
+		Status:   Listed,
+		ListedAt: time.Unix(857174400, 0).UTC(),
+	}
+}
+
+// ---------------------------------------------------------------------------
+// List
+// ---------------------------------------------------------------------------
+
+func TestService_List_Success(t *testing.T) {
 	ctx := context.Background()
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	const (
-		testGuildID           = "guild-1"
-		testInitialGold       = 200
-		testInitialReserve    = 100
-		testInitialDailyLimit = 200
-		testInitialDailySpent = 0
-	)
+	iSvc := &MockItemService{defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+	oSvc := NewOrderService(r, wSvc, iSvc, r)
 
-	gRepo := &MockGuildRepo{
-		guilds: map[string]*guild.Guild{
-			testGuildID: {
-				ID:         testGuildID,
-				Gold:       testInitialGold,
-				Reserved:   testInitialReserve,
-				DailyLimit: testInitialDailyLimit,
-				DailySpent: testInitialDailySpent,
-			},
-		},
-	}
-
-	const (
-		initialOrderID       = "o-1"
-		initialOrderItemID   = "user-1"
-		initialOrderSellerID = "seller-1"
-		initialOrderBuyerID  = "user-2"
-		initialOrderPrice    = 2000
-		initialOrderStatus   = Listed
-		initialListedEpoch   = 857174400
-
-		initialOrderID2       = "o-10"
-		initialOrderItemID2   = "user-10"
-		initialOrderSellerID2 = "seller-10"
-		initialOrderBuyerID2  = "user-20"
-		initialOrderPrice2    = 4000
-		initialOrderStatus2   = Listed
-		initialListedEpoch2   = 857174422
-	)
-
-	oRepo := &MockOrderRepo{
-		orders: map[string]*LimitOrder{
-			initialOrderID: {
-				ID:       initialOrderID,
-				ItemID:   initialOrderItemID,
-				SellerID: initialOrderSellerID,
-				BuyerID:  initialOrderBuyerID,
-				Price:    initialOrderPrice,
-				Status:   initialOrderStatus,
-				ListedAt: time.Unix(initialListedEpoch, 0).UTC(),
-			},
-			initialOrderID2: {
-				ID:       initialOrderID2,
-				ItemID:   initialOrderItemID2,
-				SellerID: initialOrderSellerID2,
-				BuyerID:  initialOrderBuyerID2,
-				Price:    initialOrderPrice2,
-				Status:   initialOrderStatus2,
-				ListedAt: time.Unix(initialListedEpoch2, 0).UTC(),
-			},
-		},
-	}
-
-	svc := NewOrderService(oRepo, gRepo)
-
-	err := svc.Cancel(ctx, initialOrderID, initialOrderBuyerID)
+	order, err := oSvc.List(ctx, itemID, sellerID, 200)
 	if err != nil {
-		t.Errorf("couldn't cancel order id: %s, for buyer id: %s", initialOrderID, initialOrderBuyerID)
+		t.Fatal(err)
+	}
+	if order.Status != Listed {
+		t.Errorf("expected status Listed, got %q", order.Status)
+	}
+	i, err := iSvc.GetItem(ctx, itemID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i.Status != item.ListedInOrder {
+		t.Errorf("expected status Listed, got %q", order.Status)
+	}
+}
+
+func TestService_List_InvalidPrice(t *testing.T) {
+	ctx := context.Background()
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{}}
+	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+
+	_, err := newSvc(oRepo, gRepo, iRepo).List(ctx, itemID, sellerID, 0)
+	if err == nil {
+		t.Error("expected error for zero price, got nil")
+	}
+}
+
+func TestService_List_NotOwner(t *testing.T) {
+	ctx := context.Background()
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{}}
+	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+
+	_, err := newSvc(oRepo, gRepo, iRepo).List(ctx, itemID, buyerID, 100)
+	if err == nil {
+		t.Error("expected error when non-owner lists item, got nil")
+	}
+}
+
+func TestService_List_ItemUnavailable(t *testing.T) {
+	ctx := context.Background()
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{}}
+	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
+	it := defaultItem()
+	it.Available = false
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: it}}
+
+	_, err := newSvc(oRepo, gRepo, iRepo).List(ctx, itemID, sellerID, 100)
+	if err == nil {
+		t.Error("expected error for unavailable item, got nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Buy
+// ---------------------------------------------------------------------------
+
+func TestService_Buy_Success(t *testing.T) {
+	ctx := context.Background()
+	price := float64(2000)
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(price)}}
+	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+	svc := newSvc(oRepo, gRepo, iRepo)
+
+	if err := svc.Buy(ctx, orderID, buyerID); err != nil {
+		t.Fatal(err)
+	}
+
+	o := oRepo.orders[orderID]
+	if o.Status != Sold {
+		t.Errorf("expected order status Sold, got %q", o.Status)
+	}
+	if o.BuyerID == nil || *o.BuyerID != buyerID {
+		t.Errorf("expected BuyerID %q, got %v", buyerID, o.BuyerID)
+	}
+	if gRepo.guilds[buyerID].Gold != 10000-price {
+		t.Errorf("buyer gold not debited correctly")
+	}
+	if gRepo.guilds[sellerID].Gold != price {
+		t.Errorf("seller gold not credited correctly")
+	}
+	if iRepo.items[itemID].OwnerID != buyerID {
+		t.Error("item ownership not transferred to buyer")
+	}
+}
+
+func TestService_Buy_InsufficientGold(t *testing.T) {
+	ctx := context.Background()
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(99999)}}
+	gRepo := &MockGuildRepo{guilds: defaultGuilds()} // buyer has 10000
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+
+	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, buyerID); err == nil {
+		t.Error("expected error for insufficient gold, got nil")
+	}
+}
+
+func TestService_Buy_DailyLimitReached(t *testing.T) {
+	ctx := context.Background()
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(100)}}
+	guilds := defaultGuilds()
+	guilds[buyerID].DailySpent = guilds[buyerID].DailyLimit // already at limit
+	gRepo := &MockGuildRepo{guilds: guilds}
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+
+	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, buyerID); err == nil {
+		t.Error("expected error for daily limit, got nil")
+	}
+}
+
+func TestService_Buy_DailyLimitZeroMeansUnlimited(t *testing.T) {
+	ctx := context.Background()
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(100)}}
+	guilds := defaultGuilds()
+	guilds[buyerID].DailyLimit = 0
+	guilds[buyerID].DailySpent = 999999
+	gRepo := &MockGuildRepo{guilds: guilds}
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+
+	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, buyerID); err != nil {
+		t.Errorf("expected no error when DailyLimit=0, got %v", err)
+	}
+}
+
+func TestService_Buy_AlreadySold(t *testing.T) {
+	ctx := context.Background()
+	o := listedOrder(100)
+	o.Status = Sold
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: o}}
+	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+
+	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, buyerID); err == nil {
+		t.Error("expected error buying already-sold order, got nil")
+	}
+}
+
+func TestService_Buy_CanceledOrderNotBuyable(t *testing.T) {
+	ctx := context.Background()
+	o := listedOrder(100)
+	o.Status = Canceled
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: o}}
+	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+
+	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, buyerID); err == nil {
+		t.Error("expected error buying canceled order, got nil")
+	}
+}
+
+func TestService_Buy_CannotBuyOwnListing(t *testing.T) {
+	ctx := context.Background()
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(100)}}
+	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+
+	// seller tries to buy their own listing
+	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, sellerID); err == nil {
+		t.Error("expected error when seller buys own listing, got nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Cancel
+// ---------------------------------------------------------------------------
+
+func TestService_Cancel_Success(t *testing.T) {
+	ctx := context.Background()
+	it := defaultItem()
+	it.Available = false // locked by the listing
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(100)}}
+	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: it}}
+
+	if err := newSvc(oRepo, gRepo, iRepo).Cancel(ctx, orderID, sellerID); err != nil {
+		t.Fatal(err)
+	}
+	if oRepo.orders[orderID].Status != Canceled {
+		t.Error("expected order status Canceled")
+	}
+	if !iRepo.items[itemID].Available {
+		t.Error("expected item to be available again after cancel")
+	}
+}
+
+func TestService_Cancel_WrongSeller(t *testing.T) {
+	ctx := context.Background()
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(100)}}
+	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+
+	if err := newSvc(oRepo, gRepo, iRepo).Cancel(ctx, orderID, buyerID); err == nil {
+		t.Error("expected error when non-seller cancels, got nil")
+	}
+}
+
+func TestService_Cancel_AlreadySold(t *testing.T) {
+	ctx := context.Background()
+	o := listedOrder(100)
+	o.Status = Sold
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: o}}
+	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
+	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+
+	if err := newSvc(oRepo, gRepo, iRepo).Cancel(ctx, orderID, sellerID); err == nil {
+		t.Error("expected error canceling already-sold order, got nil")
 	}
 }
