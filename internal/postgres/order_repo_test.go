@@ -15,7 +15,7 @@ func TestOrderRepository_CreateGetUpdate(t *testing.T) {
 
 	// insert guilds (seller/buyer), and an item
 	sellerID := "guild-1"
-	buyerID := "guild-1"
+	buyerID := "guild-2"
 	itemID := "item-1"
 
 	// insert guilds

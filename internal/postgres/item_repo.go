@@ -59,10 +59,10 @@ func (r *ItemRepository) ListFree(ctx context.Context) ([]*item.Item, error) {
 
 	if tx := getTx(ctx); tx != nil {
 		rows, err = tx.QueryContext(ctx, `SELECT id, name, type, owner_id, status, base_price 
-		FROM items WHERE status = free`)
+		FROM items WHERE status = 'free'`)
 	} else {
 		rows, err = r.db.QueryContext(ctx, `SELECT id, name, type, owner_id, status, base_price 
-		FROM items WHERE status = free`)
+		FROM items WHERE status = 'free'`)
 	}
 	if err != nil {
 		return nil, err
