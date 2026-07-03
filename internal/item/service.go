@@ -4,15 +4,20 @@ import (
 	"context"
 )
 
-type ItemService struct {
-	itemRepository Repository
+type ItemService interface {
+	Get(ctx context.Context, id string) (*Item, error)
+	ListFree(ctx context.Context) ([]*Item, error)
 }
 
-func NewItemService(r Repository) *ItemService {
-	return &ItemService{itemRepository: r}
+type ItemServiceImpl struct {
+	itemRepository ItemRepository
 }
 
-func (s *ItemService) Get(ctx context.Context, id string) (*Item, error) {
+func NewItemService(r ItemRepository) *ItemServiceImpl {
+	return &ItemServiceImpl{itemRepository: r}
+}
+
+func (s *ItemServiceImpl) Get(ctx context.Context, id string) (*Item, error) {
 	repo := s.itemRepository
 	it, err := repo.GetByID(ctx, id)
 	if err != nil {
@@ -22,7 +27,7 @@ func (s *ItemService) Get(ctx context.Context, id string) (*Item, error) {
 	return it, nil
 }
 
-func (s *ItemService) ListFree(ctx context.Context) ([]*Item, error) {
+func (s *ItemServiceImpl) ListFree(ctx context.Context) ([]*Item, error) {
 	repo := s.itemRepository
 
 	av, err := repo.ListFree(ctx)

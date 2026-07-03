@@ -27,16 +27,22 @@ type ItemService interface {
 	UpdateItem(ctx context.Context, item *item.Item) error
 }
 
-// OrderService handles listing and purchasing of Common/Rare items.
-type OrderService struct {
+type OrderService interface {
+	List(ctx context.Context, itemID, sellerID string, price float64) (*LimitOrder, error)
+	Buy(ctx context.Context, orderID, buyerID string) error
+	Cancel(ctx context.Context, orderID, sellerID string) error
+}
+
+// OrderServiceImpl handles listing and purchasing of Common/Rare items.
+type OrderServiceImpl struct {
 	repo      OrderRepository
 	walletSvc WalletService
 	itemSvc   ItemService
 	tx        Transactor
 }
 
-func NewOrderService(r OrderRepository, wSvc WalletService, iSvc ItemService, t Transactor) *OrderService {
-	return &OrderService{
+func NewOrderService(r OrderRepository, wSvc WalletService, iSvc ItemService, t Transactor) *OrderServiceImpl {
+	return &OrderServiceImpl{
 		repo:      r,
 		walletSvc: wSvc,
 		itemSvc:   iSvc,
@@ -44,7 +50,7 @@ func NewOrderService(r OrderRepository, wSvc WalletService, iSvc ItemService, t 
 	}
 }
 
-func (s *OrderService) List(ctx context.Context, itemID, sellerID string, price float64) (*LimitOrder, error) {
+func (s *OrderServiceImpl) List(ctx context.Context, itemID, sellerID string, price float64) (*LimitOrder, error) {
 	if price <= 0 {
 		return nil, fmt.Errorf("price must be positive, got %v", price)
 	}
@@ -85,7 +91,7 @@ func (s *OrderService) List(ctx context.Context, itemID, sellerID string, price 
 	return order, nil
 }
 
-func (s *OrderService) Buy(ctx context.Context, orderID, buyerID string) error {
+func (s *OrderServiceImpl) Buy(ctx context.Context, orderID, buyerID string) error {
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		o, err := s.repo.GetByID(ctx, orderID)
 		if err != nil {
@@ -131,7 +137,7 @@ func (s *OrderService) Buy(ctx context.Context, orderID, buyerID string) error {
 	})
 }
 
-func (s *OrderService) Cancel(ctx context.Context, orderID, sellerID string) error {
+func (s *OrderServiceImpl) Cancel(ctx context.Context, orderID, sellerID string) error {
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		order, err := s.repo.GetByID(ctx, orderID)
 		if err != nil {

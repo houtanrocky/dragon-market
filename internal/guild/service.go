@@ -6,15 +6,22 @@ import (
 	"fmt"
 )
 
-type WalletService struct {
+type WalletService interface {
+	Reserve(ctx context.Context, id string, amount float64) error
+	Release(ctx context.Context, id string, amount float64) error
+	Deduct(ctx context.Context, id string, amount float64) error
+	Earn(ctx context.Context, id string, amount float64) error
+	Spend(ctx context.Context, id string, amount float64) error
+}
+type WalletServiceImpl struct {
 	guildRepository GuildRepository
 }
 
-func NewWalletService(r GuildRepository) *WalletService {
-	return &WalletService{guildRepository: r}
+func NewWalletService(r GuildRepository) *WalletServiceImpl {
+	return &WalletServiceImpl{guildRepository: r}
 }
 
-func (s *WalletService) Reserve(ctx context.Context, id string, amount float64) error {
+func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount float64) error {
 	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
@@ -38,7 +45,7 @@ func (s *WalletService) Reserve(ctx context.Context, id string, amount float64) 
 	})
 }
 
-func (s *WalletService) Deduct(ctx context.Context, id string, amount float64) error {
+func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount float64) error {
 	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
@@ -62,7 +69,7 @@ func (s *WalletService) Deduct(ctx context.Context, id string, amount float64) e
 	})
 }
 
-func (s *WalletService) Release(ctx context.Context, id string, amount float64) error {
+func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount float64) error {
 	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
@@ -88,7 +95,7 @@ func (s *WalletService) Release(ctx context.Context, id string, amount float64) 
 	})
 }
 
-func (s *WalletService) Earn(ctx context.Context, id string, amount float64) error {
+func (s *WalletServiceImpl) Earn(ctx context.Context, id string, amount float64) error {
 	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
@@ -104,7 +111,7 @@ func (s *WalletService) Earn(ctx context.Context, id string, amount float64) err
 	})
 }
 
-func (s *WalletService) Spend(ctx context.Context, id string, amount float64) error {
+func (s *WalletServiceImpl) Spend(ctx context.Context, id string, amount float64) error {
 	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
