@@ -2,11 +2,17 @@ package auction
 
 import "time"
 
-type Status string
+type AuctionStatus string
+type BidStatus string
 
 const (
-	Active Status = "active"
-	Ended  Status = "ended"
+	ActiveAuction AuctionStatus = "active"
+	EndedAuction  AuctionStatus = "ended"
+)
+
+const (
+	ActiveBid    BidStatus = "active"
+	CancelledBid BidStatus = "cancelled"
 )
 
 type Auction struct {
@@ -14,7 +20,7 @@ type Auction struct {
 	ItemID   string
 	SellerID string
 	EndsAt   time.Time
-	Status   Status
+	Status   AuctionStatus
 }
 
 type Bid struct {
@@ -23,4 +29,5 @@ type Bid struct {
 	BidderID  string
 	Amount    float64
 	PlacedAt  time.Time
+	Status    BidStatus // "active", "cancelled", "winning" (optional)
 }

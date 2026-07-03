@@ -11,6 +11,4 @@ type AuctionRepository interface {
 	PlaceBid(ctx context.Context, b *Bid) error
 	GetTopBid(ctx context.Context, auctionID string) (*Bid, error)
 	GetBidsByAuction(ctx context.Context, auctionID string) ([]*Bid, error)
-
-	RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }

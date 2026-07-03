@@ -3,6 +3,7 @@ package auction
 import (
 	"context"
 	"fmt"
+	"market-dragon/internal/item"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +17,12 @@ type WalletService interface {
 	Spend(ctx context.Context, id string, amount float64) error
 }
 
+type ItemRepository interface {
+	GetByID(ctx context.Context, id string) (*item.Item, error)
+	Update(ctx context.Context, item *item.Item) error
+	ListFree(ctx context.Context) ([]*item.Item, error)
+}
+
 // AuctionServiceImpl enforces:
 // - one active auction per legendary item
 // - min 5% bid increment over current top bid
@@ -26,10 +33,11 @@ type WalletService interface {
 type AuctionServiceImpl struct {
 	repo          AuctionRepository
 	walletService WalletService
+	itemRepo      ItemRepository
 }
 
-func NewAuctionService(repo AuctionRepository, walletService WalletService) *AuctionServiceImpl {
-	return &AuctionServiceImpl{repo: repo, walletService: walletService}
+func NewAuctionService(repo AuctionRepository, walletSvc WalletService, itemRepo ItemRepository) *AuctionServiceImpl {
+	return &AuctionServiceImpl{repo: repo, walletService: walletSvc, itemRepo: itemRepo}
 }
 
 func (s *AuctionServiceImpl) StartAuction(ctx context.Context, itemID, sellerID string) (*Auction, error) {
@@ -38,7 +46,7 @@ func (s *AuctionServiceImpl) StartAuction(ctx context.Context, itemID, sellerID 
 		ItemID:   itemID,
 		SellerID: sellerID,
 		EndsAt:   time.Time{},
-		Status:   Active,
+		Status:   ActiveAuction,
 	}
 	fmt.Println(a)
 	//s.repo.Create()
