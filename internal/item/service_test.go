@@ -22,10 +22,10 @@ func (r MockItemRepository) Update(ctx context.Context, i *Item) error {
 	return nil
 }
 
-func (r MockItemRepository) ListAvailable(ctx context.Context) ([]*Item, error) {
+func (r MockItemRepository) ListFree(ctx context.Context) ([]*Item, error) {
 	var result []*Item
 	for _, it := range r.items {
-		if it.Available {
+		if it.Status == Free {
 			result = append(result, it)
 		}
 	}
@@ -39,7 +39,7 @@ func TestService_Get_Success(t *testing.T) {
 		testInitialItemName  = "Sussy Sword"
 		testInitialItemType  = Common
 		testInitialOwnerId   = "guild-1"
-		testInitialAvailable = true
+		testInitialStatus    = Free
 		testInitialBasePrice = 1000
 	)
 	repo := &MockItemRepository{items: map[string]*Item{
@@ -48,7 +48,7 @@ func TestService_Get_Success(t *testing.T) {
 			Name:      testInitialItemName,
 			Type:      testInitialItemType,
 			OwnerID:   testInitialOwnerId,
-			Available: testInitialAvailable,
+			Status:    testInitialStatus,
 			BasePrice: testInitialBasePrice,
 		},
 	}}
@@ -65,16 +65,16 @@ func TestService_Get_Success(t *testing.T) {
 	}
 }
 
-func TestService_ListAvailable(t *testing.T) {
+func TestService_ListFree(t *testing.T) {
 	// -------- Arrange ---------------------------
 	initialItems := map[string]*Item{
 		"item-1": {
-			ID:        "item-1",
-			Available: true,
+			ID:     "item-1",
+			Status: Free,
 		},
 		"item-2": {
-			ID:        "item-2",
-			Available: true,
+			ID:     "item-2",
+			Status: Free,
 		},
 	}
 
@@ -83,7 +83,7 @@ func TestService_ListAvailable(t *testing.T) {
 	svc := NewItemService(repo)
 
 	// -------- Act ------------
-	items, err := svc.ListAvailable(ctx)
+	items, err := svc.ListFree(ctx)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -93,8 +93,8 @@ func TestService_ListAvailable(t *testing.T) {
 		t.Errorf("expected 2 items, got %v", len(items))
 	}
 	for _, it := range items {
-		if it.Available != true {
-			t.Errorf("returned item %v is not available", it.ID)
+		if it.Status != Free {
+			t.Errorf("returned item %v is not free", it.ID)
 		}
 	}
 

@@ -22,10 +22,10 @@ func (s *ItemService) Get(ctx context.Context, id string) (*Item, error) {
 	return it, nil
 }
 
-func (s *ItemService) ListAvailable(ctx context.Context) ([]*Item, error) {
+func (s *ItemService) ListFree(ctx context.Context) ([]*Item, error) {
 	repo := s.itemRepository
 
-	av, err := repo.ListAvailable(ctx)
+	av, err := repo.ListFree(ctx)
 	if err != nil {
 		return nil, err
 	}

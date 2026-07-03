@@ -110,7 +110,7 @@ func (s *MockItemService) UpdateItem(ctx context.Context, item *item.Item) error
 	return nil
 }
 
-//func (r *MockItemRepo) ListAvailable(ctx context.Context) ([]*item.Item, error) {
+//func (r *MockItemRepo) ListFree(ctx context.Context) ([]*item.Item, error) {
 //	var result []*item.Item
 //	for _, it := range r.items {
 //		if it.Status != item.ListedInAuction {
@@ -232,7 +232,7 @@ func TestService_List_ItemListedInAuction(t *testing.T) {
 
 	_, err := NewOrderService(oRepo, wSvc, iSvc, r).List(ctx, item3ID, sellerID, 100)
 	if err == nil {
-		t.Error("expected error for unavailable item, got nil")
+		t.Error("expected error for listing an item listed in auction, got nil")
 	}
 }
 

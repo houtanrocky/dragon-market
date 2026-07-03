@@ -19,7 +19,7 @@ func TestItemRepository_GetByID(t *testing.T) {
 		testItemInitialName      = "Sassy Sword"
 		testItemInitialType      = item.Common
 		testItemInitialOwner     = testInitialGuildID
-		testItemInitialAvailable = true
+		testItemInitialStatus    = item.Free
 		testItemInitialBasePrice = 1000
 	)
 	ctx := context.Background()
@@ -37,10 +37,10 @@ func TestItemRepository_GetByID(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = testDB.ExecContext(ctx,
-		`INSERT INTO items (id, name, type, owner_id, available, base_price)
+		`INSERT INTO items (id, name, type, owner_id, status, base_price)
 		VALUES ($1, $2, $3, $4, $5, $6)`,
 		testItemInitialID, testItemInitialName, testItemInitialType, testItemInitialOwner,
-		testItemInitialAvailable, testItemInitialBasePrice)
+		testItemInitialStatus, testItemInitialBasePrice)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestItemRepository_GetByID(t *testing.T) {
 	}
 }
 
-func TestItemRepository_ListAvailable(t *testing.T) {
+func TestItemRepository_ListFree(t *testing.T) {
 	// ----- Arrange --------------
 	testGuilds := map[string]*guild.Guild{
 		"guild-1": {
@@ -72,7 +72,7 @@ func TestItemRepository_ListAvailable(t *testing.T) {
 			Name:      "Sassy Sword",
 			Type:      item.Common,
 			OwnerID:   "guild-1",
-			Available: true,
+			Status:    item.Free,
 			BasePrice: 100,
 		},
 		"item-2": {
@@ -80,7 +80,7 @@ func TestItemRepository_ListAvailable(t *testing.T) {
 			Name:      "Brown Sword",
 			Type:      item.Common,
 			OwnerID:   "guild-2",
-			Available: true,
+			Status:    item.Free,
 			BasePrice: 200,
 		},
 	}
@@ -103,17 +103,17 @@ func TestItemRepository_ListAvailable(t *testing.T) {
 	}
 	for _, i := range testItems {
 		_, err := testDB.ExecContext(ctx,
-			`INSERT INTO items (id, name, type, owner_id, available, base_price)
+			`INSERT INTO items (id, name, type, owner_id, status, base_price)
 		VALUES ($1, $2, $3, $4, $5, $6)`,
 			i.ID, i.Name, i.Type, i.OwnerID,
-			i.Available, i.BasePrice)
+			i.Status, i.BasePrice)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	// ------ Act ---------
-	items, err := repo.ListAvailable(ctx)
+	items, err := repo.ListFree(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,13 +147,13 @@ func TestItemRepository_GetAndUpdate(t *testing.T) {
 		testItemInitialName      = "Sassy Sword"
 		testItemInitialType      = item.Common
 		testItemInitialOwner     = testInitialGuildID
-		testItemInitialAvailable = true
+		testItemInitialStatus    = item.Free
 		testItemInitialBasePrice = 1000
 
 		testItemExpectedName      = "Brave Sword"
 		testItemExpectedType      = item.Rare
 		testItemExpectedOwner     = "guild-2"
-		testItemExpectedAvailable = false
+		testItemExpectedStatus    = item.ListedInOrder
 		testItemExpectedBasePrice = 299.0
 	)
 
@@ -183,10 +183,10 @@ func TestItemRepository_GetAndUpdate(t *testing.T) {
 	}
 	// ---- Insert an item ----
 	_, err = testDB.ExecContext(ctx,
-		`INSERT INTO items (id, name, type, owner_id, available, base_price)
+		`INSERT INTO items (id, name, type, owner_id, status, base_price)
 		VALUES ($1, $2, $3, $4, $5, $6)`,
 		testItemInitialID, testItemInitialName, testItemInitialType, testItemInitialOwner,
-		testItemInitialAvailable, testItemInitialBasePrice)
+		testItemInitialStatus, testItemInitialBasePrice)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestItemRepository_GetAndUpdate(t *testing.T) {
 	it.Type = testItemExpectedType
 	it.BasePrice = testItemExpectedBasePrice
 	it.OwnerID = testItemExpectedOwner
-	it.Available = testItemExpectedAvailable
+	it.Status = testItemExpectedStatus
 
 	err = repo.Update(ctx, it)
 	if err != nil {
@@ -222,8 +222,8 @@ func TestItemRepository_GetAndUpdate(t *testing.T) {
 	if updated.OwnerID != testItemExpectedOwner {
 		t.Errorf("expected OwnerID=%s, got %s", testItemExpectedOwner, updated.OwnerID)
 	}
-	if updated.Available != testItemExpectedAvailable {
-		t.Errorf("expected Available=%v, got %v", testItemExpectedAvailable, updated.Available)
+	if updated.Status != testItemExpectedStatus {
+		t.Errorf("expected Status=%v, got %v", testItemExpectedStatus, updated.Status)
 	}
 	if updated.BasePrice != testItemExpectedBasePrice {
 		t.Errorf("expected BasePrice=%.2f, got %.2f", testItemExpectedBasePrice, updated.BasePrice)
