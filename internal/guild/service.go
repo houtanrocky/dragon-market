@@ -6,13 +6,6 @@ import (
 	"fmt"
 )
 
-type WalletService interface {
-	Reserve(ctx context.Context, id string, amount float64) error
-	Release(ctx context.Context, id string, amount float64) error
-	Deduct(ctx context.Context, id string, amount float64) error
-	Earn(ctx context.Context, id string, amount float64) error
-	Spend(ctx context.Context, id string, amount float64) error
-}
 type WalletServiceImpl struct {
 	guildRepository GuildRepository
 }

@@ -2,13 +2,18 @@ package auction
 
 import (
 	"context"
-	"market-dragon/internal/guild"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-type AuctionService interface {
+type WalletService interface {
+	Reserve(ctx context.Context, id string, amount float64) error
+	Release(ctx context.Context, id string, amount float64) error
+	Deduct(ctx context.Context, id string, amount float64) error
+	Earn(ctx context.Context, id string, amount float64) error
+	Spend(ctx context.Context, id string, amount float64) error
 }
 
 // AuctionServiceImpl enforces:
@@ -20,10 +25,10 @@ type AuctionService interface {
 // - cancel bid only if not the current top bidder
 type AuctionServiceImpl struct {
 	repo          AuctionRepository
-	walletService guild.WalletService
+	walletService WalletService
 }
 
-func NewAuctionService(repo AuctionRepository, walletService guild.WalletService) *AuctionServiceImpl {
+func NewAuctionService(repo AuctionRepository, walletService WalletService) *AuctionServiceImpl {
 	return &AuctionServiceImpl{repo: repo, walletService: walletService}
 }
 
@@ -35,7 +40,9 @@ func (s *AuctionServiceImpl) StartAuction(ctx context.Context, itemID, sellerID 
 		EndsAt:   time.Time{},
 		Status:   Active,
 	}
-	s.repo.Create()
+	fmt.Println(a)
+	//s.repo.Create()
+	return nil, nil
 }
 
 func (s *AuctionServiceImpl) PlaceBid(ctx context.Context, auctionID, bidderID string, amount float64) (*Bid, error) {

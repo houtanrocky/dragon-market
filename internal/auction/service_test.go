@@ -3,6 +3,7 @@ package auction
 import (
 	"context"
 	"fmt"
+	"market-dragon/internal/guild"
 	"testing"
 )
 
@@ -80,10 +81,18 @@ func (r MockAuctionRepo) GetBidByAuction(ctx context.Context, auctionID string) 
 	return bids, nil
 }
 
+type MockWalletService struct {
+}
+
+func NewMockWalletService() *MockWalletService {
+	guild.WalletService()
+}
+
 func TestService_StartAuction(t *testing.T) {
 	ctx := context.Background()
 	r := &MockAuctionRepo{}
-	aSvc := NewAuctionService(r)
+	wSvc := NewWalletService()
+	aSvc := NewAuctionService(r, wSvc)
 }
 
 func TestService_PlaceBid(t *testing.T) {
