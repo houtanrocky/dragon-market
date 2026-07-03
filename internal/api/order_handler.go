@@ -7,7 +7,7 @@ import (
 )
 
 type orderHandler struct {
-	svc *order.OrderServiceImpl
+	svc *order.OrderService
 }
 
 // POST /orders

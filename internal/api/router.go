@@ -13,7 +13,7 @@ func NewRouter(
 	guildSvc *guild.WalletServiceImpl,
 	itemSvc *item.ItemServiceImpl,
 	auctionSvc *auction.AuctionServiceImpl,
-	orderSvc *order.Service,
+	orderSvc *order.OrderService,
 ) http.Handler {
 	mux := http.NewServeMux()
 
@@ -23,7 +23,7 @@ func NewRouter(
 	oh := &orderHandler{svc: orderSvc}
 
 	// Guild wallet
-	mux.HandleFunc("GET /guilds/{id}/wallet", gh.GetWallet)
+	mux.HandleFunc("GET /guilds/{id}/wallet", gh.Reserve)
 
 	// Items
 	mux.HandleFunc("GET /items", ih.List)
@@ -35,7 +35,7 @@ func NewRouter(
 	mux.HandleFunc("DELETE /auctions/{auctionID}/bids/{bidID}", ah.CancelBid)
 
 	// Limit orders (common + rare)
-	mux.HandleFunc("POST /orders", oh.List)
+	mux.HandleFunc("POST /orders", oh.Create)
 	mux.HandleFunc("POST /orders/{id}/buy", oh.Buy)
 	mux.HandleFunc("DELETE /orders/{id}", oh.Cancel)
 
