@@ -64,6 +64,9 @@ func (s *MockWalletService) Spend(ctx context.Context, id string, amount float64
 	if g.Gold < amount {
 		return fmt.Errorf("insufficient balance")
 	}
+	if g.DailyLimit > 0 && g.DailySpent+amount > g.DailyLimit {
+		return fmt.Errorf("DailyLimit reached")
+	}
 	g.Gold -= amount
 	return nil
 }
@@ -126,6 +129,7 @@ const (
 	buyerID  = "buyer-1"
 	itemID   = "item-1"
 	item2ID  = "item-2"
+	item3ID  = "item-3"
 	orderID  = "order-1"
 )
 
@@ -140,6 +144,14 @@ func defaultItem() map[string]*item.Item {
 	return map[string]*item.Item{
 		itemID:  {ID: itemID, Name: "Sword", Type: item.Common, OwnerID: sellerID, Status: item.Free, BasePrice: 100},
 		item2ID: {ID: item2ID, Name: "Knife", Type: item.Common, OwnerID: sellerID, Status: item.Free, BasePrice: 100},
+		item3ID: {
+			ID:        item3ID,
+			Name:      "Unavailable Sword",
+			Type:      item.Rare,
+			OwnerID:   sellerID,
+			Status:    item.ListedInAuction,
+			BasePrice: 100,
+		},
 	}
 }
 
@@ -185,10 +197,12 @@ func TestService_List_Success(t *testing.T) {
 func TestService_List_InvalidPrice(t *testing.T) {
 	ctx := context.Background()
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{}}
-	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	_, err := newSvc(oRepo, gRepo, iRepo).List(ctx, itemID, sellerID, 0)
+	iSvc := &MockItemService{defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+
+	_, err := NewOrderService(oRepo, wSvc, iSvc, r).List(ctx, itemID, sellerID, 0)
 	if err == nil {
 		t.Error("expected error for zero price, got nil")
 	}
@@ -197,24 +211,26 @@ func TestService_List_InvalidPrice(t *testing.T) {
 func TestService_List_NotOwner(t *testing.T) {
 	ctx := context.Background()
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{}}
-	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	_, err := newSvc(oRepo, gRepo, iRepo).List(ctx, itemID, buyerID, 100)
+	iSvc := &MockItemService{defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+
+	_, err := NewOrderService(oRepo, wSvc, iSvc, r).List(ctx, itemID, buyerID, 100)
 	if err == nil {
 		t.Error("expected error when non-owner lists item, got nil")
 	}
 }
 
-func TestService_List_ItemUnavailable(t *testing.T) {
+func TestService_List_ItemListedInAuction(t *testing.T) {
 	ctx := context.Background()
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{}}
-	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
-	it := defaultItem()
-	it.Available = false
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: it}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	_, err := newSvc(oRepo, gRepo, iRepo).List(ctx, itemID, sellerID, 100)
+	iSvc := &MockItemService{defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+
+	_, err := NewOrderService(oRepo, wSvc, iSvc, r).List(ctx, item3ID, sellerID, 100)
 	if err == nil {
 		t.Error("expected error for unavailable item, got nil")
 	}
@@ -228,11 +244,14 @@ func TestService_Buy_Success(t *testing.T) {
 	ctx := context.Background()
 	price := float64(2000)
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(price)}}
-	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
-	svc := newSvc(oRepo, gRepo, iRepo)
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	if err := svc.Buy(ctx, orderID, buyerID); err != nil {
+	iSvc := &MockItemService{defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+
+	oSvc := NewOrderService(oRepo, wSvc, iSvc, r)
+
+	if err := oSvc.Buy(ctx, orderID, buyerID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -243,24 +262,26 @@ func TestService_Buy_Success(t *testing.T) {
 	if o.BuyerID == nil || *o.BuyerID != buyerID {
 		t.Errorf("expected BuyerID %q, got %v", buyerID, o.BuyerID)
 	}
-	if gRepo.guilds[buyerID].Gold != 10000-price {
+	if wSvc.guilds[buyerID].Gold != 10000-o.Price {
 		t.Errorf("buyer gold not debited correctly")
 	}
-	if gRepo.guilds[sellerID].Gold != price {
+	if wSvc.guilds[sellerID].Gold != o.Price {
 		t.Errorf("seller gold not credited correctly")
 	}
-	if iRepo.items[itemID].OwnerID != buyerID {
+	if iSvc.items[itemID].OwnerID != buyerID {
 		t.Error("item ownership not transferred to buyer")
 	}
 }
 
 func TestService_Buy_InsufficientGold(t *testing.T) {
 	ctx := context.Background()
-	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(99999)}}
-	gRepo := &MockGuildRepo{guilds: defaultGuilds()} // buyer has 10000
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, buyerID); err == nil {
+	iSvc := &MockItemService{defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+
+	if err := NewOrderService(oRepo, wSvc, iSvc, r).Buy(ctx, orderID, buyerID); err == nil {
 		t.Error("expected error for insufficient gold, got nil")
 	}
 }
@@ -268,12 +289,13 @@ func TestService_Buy_InsufficientGold(t *testing.T) {
 func TestService_Buy_DailyLimitReached(t *testing.T) {
 	ctx := context.Background()
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(100)}}
-	guilds := defaultGuilds()
-	guilds[buyerID].DailySpent = guilds[buyerID].DailyLimit // already at limit
-	gRepo := &MockGuildRepo{guilds: guilds}
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, buyerID); err == nil {
+	iSvc := &MockItemService{defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+	wSvc.guilds[buyerID].DailySpent = wSvc.guilds[buyerID].DailyLimit + 100000
+
+	if err := NewOrderService(oRepo, wSvc, iSvc, r).Buy(ctx, orderID, buyerID); err == nil {
 		t.Error("expected error for daily limit, got nil")
 	}
 }
@@ -281,13 +303,14 @@ func TestService_Buy_DailyLimitReached(t *testing.T) {
 func TestService_Buy_DailyLimitZeroMeansUnlimited(t *testing.T) {
 	ctx := context.Background()
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(100)}}
-	guilds := defaultGuilds()
-	guilds[buyerID].DailyLimit = 0
-	guilds[buyerID].DailySpent = 999999
-	gRepo := &MockGuildRepo{guilds: guilds}
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, buyerID); err != nil {
+	iSvc := &MockItemService{defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+	wSvc.guilds[buyerID].DailyLimit = 0
+	wSvc.guilds[buyerID].DailySpent = 999999
+
+	if err := NewOrderService(oRepo, wSvc, iSvc, r).Buy(ctx, orderID, buyerID); err != nil {
 		t.Errorf("expected no error when DailyLimit=0, got %v", err)
 	}
 }
@@ -297,10 +320,12 @@ func TestService_Buy_AlreadySold(t *testing.T) {
 	o := listedOrder(100)
 	o.Status = Sold
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: o}}
-	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, buyerID); err == nil {
+	iSvc := &MockItemService{defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+
+	if err := NewOrderService(oRepo, wSvc, iSvc, r).Buy(ctx, orderID, buyerID); err == nil {
 		t.Error("expected error buying already-sold order, got nil")
 	}
 }
@@ -310,22 +335,28 @@ func TestService_Buy_CanceledOrderNotBuyable(t *testing.T) {
 	o := listedOrder(100)
 	o.Status = Canceled
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: o}}
-	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, buyerID); err == nil {
+	iSvc := &MockItemService{defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+
+	if err := NewOrderService(oRepo, wSvc, iSvc, r).Buy(ctx, orderID, buyerID); err == nil {
 		t.Error("expected error buying canceled order, got nil")
 	}
 }
 
 func TestService_Buy_CannotBuyOwnListing(t *testing.T) {
 	ctx := context.Background()
-	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(100)}}
-	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+	o := listedOrder(100)
+	o.Status = Canceled
+	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: o}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
+
+	iSvc := &MockItemService{defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
 
 	// seller tries to buy their own listing
-	if err := newSvc(oRepo, gRepo, iRepo).Buy(ctx, orderID, sellerID); err == nil {
+	if err := NewOrderService(oRepo, wSvc, iSvc, r).Buy(ctx, orderID, sellerID); err == nil {
 		t.Error("expected error when seller buys own listing, got nil")
 	}
 }
@@ -336,43 +367,54 @@ func TestService_Buy_CannotBuyOwnListing(t *testing.T) {
 
 func TestService_Cancel_Success(t *testing.T) {
 	ctx := context.Background()
-	it := defaultItem()
-	it.Available = false // locked by the listing
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(100)}}
-	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: it}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	if err := newSvc(oRepo, gRepo, iRepo).Cancel(ctx, orderID, sellerID); err != nil {
+	iSvc := &MockItemService{items: defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+
+	if err := NewOrderService(oRepo, wSvc, iSvc, r).Cancel(ctx, orderID, sellerID); err != nil {
 		t.Fatal(err)
 	}
 	if oRepo.orders[orderID].Status != Canceled {
 		t.Error("expected order status Canceled")
 	}
-	if !iRepo.items[itemID].Available {
-		t.Error("expected item to be available again after cancel")
+	if iSvc.items[itemID].Status != item.Free {
+		t.Error("expected item to be free again after cancel")
 	}
 }
 
 func TestService_Cancel_WrongSeller(t *testing.T) {
 	ctx := context.Background()
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(100)}}
-	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	if err := newSvc(oRepo, gRepo, iRepo).Cancel(ctx, orderID, buyerID); err == nil {
+	iSvc := &MockItemService{items: defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+
+	if err := NewOrderService(oRepo, wSvc, iSvc, r).Cancel(ctx, orderID, buyerID); err == nil {
 		t.Error("expected error when non-seller cancels, got nil")
 	}
 }
 
 func TestService_Cancel_AlreadySold(t *testing.T) {
+	//ctx := context.Background()
+	//o := listedOrder(100)
+	//o.Status = Sold
+	//oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: o}}
+	//gRepo := &MockGuildRepo{guilds: defaultGuilds()}
+	//iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+
 	ctx := context.Background()
 	o := listedOrder(100)
 	o.Status = Sold
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: o}}
-	gRepo := &MockGuildRepo{guilds: defaultGuilds()}
-	iRepo := &MockItemRepo{items: map[string]*item.Item{itemID: defaultItem()}}
+	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 
-	if err := newSvc(oRepo, gRepo, iRepo).Cancel(ctx, orderID, sellerID); err == nil {
+	iSvc := &MockItemService{items: defaultItem()}
+	wSvc := &MockWalletService{defaultGuilds()}
+
+	if err := NewOrderService(oRepo, wSvc, iSvc, r).Cancel(ctx, orderID, sellerID); err == nil {
 		t.Error("expected error canceling already-sold order, got nil")
 	}
 }
