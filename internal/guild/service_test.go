@@ -27,6 +27,15 @@ func (m *MockGuildRepo) Update(ctx context.Context, g *Guild) error {
 	return nil
 }
 
+type MockTransactor struct{}
+
+func (MockTransactor) RunInTransaction(
+	ctx context.Context,
+	fn func(context.Context) error,
+) error {
+	return fn(ctx)
+}
+
 // ---------------------- reserve tests -------------
 func TestWallet_Service_Reserve_Success(t *testing.T) {
 	const (
@@ -46,7 +55,7 @@ func TestWallet_Service_Reserve_Success(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewWalletService(&repo)
+	svc := NewWalletService(&repo, &MockTransactor{})
 
 	err := svc.Reserve(ctx, testGuildID, testReserveAmount)
 
@@ -78,7 +87,7 @@ func TestWallet_Service_Reserve_Insufficient(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewWalletService(&repo)
+	svc := NewWalletService(&repo, &MockTransactor{})
 
 	err := svc.Reserve(ctx, testGuildID, testReserveAmount)
 
@@ -116,7 +125,7 @@ func TestWallet_Service_Reserve_DailyLimitReached(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewWalletService(&repo)
+	svc := NewWalletService(&repo, &MockTransactor{})
 
 	err := svc.Reserve(ctx, testGuildID, testReserveAmount)
 	if err == nil {
@@ -156,7 +165,7 @@ func TestWallet_Service_Reserve_DailySpentUpdated(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewWalletService(&repo)
+	svc := NewWalletService(&repo, &MockTransactor{})
 
 	err := svc.Reserve(ctx, testGuildID, testReserveAmount)
 	if err != nil {
@@ -195,7 +204,7 @@ func TestWallet_Service_Reserve_ZeroLimitMeansUnlimited(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewWalletService(&repo)
+	svc := NewWalletService(&repo, &MockTransactor{})
 
 	err := svc.Reserve(ctx, testGuildID, testReserveAmount)
 	if err != nil {
@@ -230,7 +239,7 @@ func TestWallet_Service_Deduct_Success(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewWalletService(&repo)
+	svc := NewWalletService(&repo, &MockTransactor{})
 
 	err := svc.Deduct(ctx, testGuildID, testDeductAmount)
 	if err != nil {
@@ -271,7 +280,7 @@ func TestWallet_Service_Deduct_Fail(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewWalletService(&repo)
+	svc := NewWalletService(&repo, &MockTransactor{})
 
 	err := svc.Deduct(ctx, testGuildID, testDeductAmount)
 	if err == nil {
@@ -312,7 +321,7 @@ func TestWallet_Service_Release_Success(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewWalletService(&repo)
+	svc := NewWalletService(&repo, &MockTransactor{})
 
 	err := svc.Release(ctx, testGuildID, testReleaseAmount)
 	if err != nil {
@@ -353,7 +362,7 @@ func TestWallet_Service_Release_Insufficient(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewWalletService(&repo)
+	svc := NewWalletService(&repo, &MockTransactor{})
 
 	err := svc.Release(ctx, testGuildID, testReleaseAmount)
 	if err == nil {
@@ -396,7 +405,7 @@ func TestWallet_Service_Release_DailySpentDecremented(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewWalletService(&repo)
+	svc := NewWalletService(&repo, &MockTransactor{})
 
 	err := svc.Release(ctx, testGuildID, testReleaseAmount)
 	if err != nil {

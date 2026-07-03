@@ -29,5 +29,5 @@ type Bid struct {
 	BidderID  string
 	Amount    float64
 	PlacedAt  time.Time
-	Status    BidStatus // "active", "cancelled", "winning" (optional)
+	Status    BidStatus // "active", "cancelled"
 }

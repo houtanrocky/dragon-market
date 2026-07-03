@@ -9,6 +9,16 @@ type AuctionRepository interface {
 	Update(ctx context.Context, a *Auction) error
 
 	PlaceBid(ctx context.Context, b *Bid) error
-	GetTopBid(ctx context.Context, auctionID string) (*Bid, error)
 	GetBidsByAuction(ctx context.Context, auctionID string) ([]*Bid, error)
+	GetTopActiveBid(
+		ctx context.Context,
+		auctionID string,
+	) (*Bid, error)
+	CancelActiveBid(
+		ctx context.Context,
+		auctionID string,
+		bidID string,
+		bidderID string,
+	) error
+	GetBidByID(ctx context.Context, bidID string) (*Bid, error)
 }

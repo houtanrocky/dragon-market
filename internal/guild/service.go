@@ -6,16 +6,27 @@ import (
 	"fmt"
 )
 
+type Transactor interface {
+	RunInTransaction(
+		ctx context.Context,
+		fn func(context.Context) error,
+	) error
+}
+
 type WalletServiceImpl struct {
 	guildRepository GuildRepository
+	tx              Transactor
 }
 
-func NewWalletService(r GuildRepository) *WalletServiceImpl {
-	return &WalletServiceImpl{guildRepository: r}
+func NewWalletService(r GuildRepository, tx Transactor) *WalletServiceImpl {
+	return &WalletServiceImpl{guildRepository: r, tx: tx}
 }
 
-func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount float64) error {
-	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
+func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount int64) error {
+	if amount <= 0 {
+		return fmt.Errorf("amount negative")
+	}
+	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
 		if errors.Is(err, ErrGuildNotFound) {
@@ -38,8 +49,11 @@ func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount float
 	})
 }
 
-func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount float64) error {
-	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
+func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount int64) error {
+	if amount <= 0 {
+		return fmt.Errorf("amount negative")
+	}
+	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
 		if errors.Is(err, ErrGuildNotFound) {
@@ -49,9 +63,11 @@ func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount float6
 			return err
 		}
 
-		available := g.Gold - g.Reserved
-		if available < amount {
-			return fmt.Errorf("insufficient available balance: have: %v need: %v", available, amount)
+		if amount > g.Reserved {
+			return fmt.Errorf("insufficient reserve")
+		}
+		if amount > g.Gold {
+			return fmt.Errorf("insufficient gold")
 		}
 		if g.Reserved < amount {
 			return fmt.Errorf("cannot deduct, only %v is reserved, need %v", g.Reserved, amount)
@@ -62,8 +78,11 @@ func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount float6
 	})
 }
 
-func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount float64) error {
-	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
+func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount int64) error {
+	if amount <= 0 {
+		return fmt.Errorf("amount negative")
+	}
+	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
 		if errors.Is(err, ErrGuildNotFound) {
@@ -88,8 +107,11 @@ func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount float
 	})
 }
 
-func (s *WalletServiceImpl) Earn(ctx context.Context, id string, amount float64) error {
-	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
+func (s *WalletServiceImpl) Earn(ctx context.Context, id string, amount int64) error {
+	if amount <= 0 {
+		return fmt.Errorf("amount negative")
+	}
+	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
 		if errors.Is(err, ErrGuildNotFound) {
@@ -104,8 +126,11 @@ func (s *WalletServiceImpl) Earn(ctx context.Context, id string, amount float64)
 	})
 }
 
-func (s *WalletServiceImpl) Spend(ctx context.Context, id string, amount float64) error {
-	return s.guildRepository.RunInTransaction(ctx, func(ctx context.Context) error {
+func (s *WalletServiceImpl) Spend(ctx context.Context, id string, amount int64) error {
+	if amount <= 0 {
+		return fmt.Errorf("amount negative")
+	}
+	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
 		g, err := repo.Get(ctx, id)
 		if errors.Is(err, ErrGuildNotFound) {

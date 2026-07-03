@@ -88,6 +88,19 @@ func (r *MockAuctionRepository) GetBidsByAuction(ctx context.Context, auctionID 
 	return bids, nil
 }
 
+func (r *MockAuctionRepository) CancelBid(ctx context.Context, auctionID, bidID, bidderID string) error {
+	b, ok := r.bids[bidID]
+	if !ok {
+		return fmt.Errorf("bid with id %v doesn't exist", bidID)
+	}
+	if b.AuctionID != auctionID || b.BidderID != bidID || b.BidderID != bidderID || b.Status != ActiveBid {
+		return fmt.Errorf("unexpected bid: %v", b)
+	}
+	b.Status = CancelledBid
+	r.bids[bidID] = b
+	return nil
+}
+
 // --- Mock Wallet Service
 type MockWalletService struct {
 	guilds map[string]*guild.Guild
@@ -223,9 +236,8 @@ func TestService_StartAuction(t *testing.T) {
 		auctions: defaultAuction(),
 		bids:     defaultBid(),
 	}
-	iR := &MockItemRepository{defaultItem()}
 	wSvc := NewMockWalletService()
-	aSvc := NewAuctionService(aR, wSvc, iR)
+	aSvc := NewAuctionService(aR, wSvc)
 
 	a, err := aSvc.StartAuction(ctx, ItemID, WalletID)
 	if err != nil {
@@ -248,17 +260,28 @@ func TestService_PlaceBid(t *testing.T) {
 		auctions: defaultAuction(),
 		bids:     defaultBid(),
 	}
-	iR := &MockItemRepository{defaultItem()}
 	wSvc := NewMockWalletService()
-	aSvc := NewAuctionService(aR, wSvc, iR)
+	aSvc := NewAuctionService(aR, wSvc)
 
-	b, err := aSvc.PlaceBid(ctx, AuctionID, WalletID2, 200)
+	err := aSvc.PlaceBid(ctx, AuctionID, WalletID2, 200)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if b.BidderID != WalletID2 || b.AuctionID != AuctionID {
-		t.Errorf("saved bid do not match")
+	var saved *Bid
+	for _, bid := range aR.bids {
+		if bid.BidderID == WalletID2 && bid.Amount == 200 {
+			saved = bid
+			break
+		}
+	}
+
+	if saved == nil {
+		t.Fatal("expected bid to be saved")
+	}
+
+	if saved.AuctionID != AuctionID {
+		t.Errorf("AuctionID = %q, want %q", saved.AuctionID, AuctionID)
 	}
 }
 
@@ -268,9 +291,8 @@ func TestService_CancelBid(t *testing.T) {
 		auctions: defaultAuction(),
 		bids:     defaultBid(),
 	}
-	iR := &MockItemRepository{defaultItem()}
 	wSvc := NewMockWalletService()
-	aSvc := NewAuctionService(aR, wSvc, iR)
+	aSvc := NewAuctionService(aR, wSvc)
 
 	err := aSvc.CancelBid(ctx, AuctionID, BidID, WalletID2)
 	if err != nil {
@@ -303,9 +325,8 @@ func TestService_EndAuction(t *testing.T) {
 		auctions: defaultAuction(),
 		bids:     defaultBid(),
 	}
-	iR := &MockItemRepository{defaultItem()}
 	wSvc := NewMockWalletService()
-	aSvc := NewAuctionService(aR, wSvc, iR)
+	aSvc := NewAuctionService(aR, wSvc)
 
 	err := aSvc.EndAuction(ctx, AuctionID)
 	if err != nil {
