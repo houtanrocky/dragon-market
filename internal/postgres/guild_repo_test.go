@@ -39,7 +39,7 @@ func TestGuildRepository_GetAndUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Test Get
+	// Test GetItem
 	g, err := repo.Get(ctx, testInitialGuildID)
 	if err != nil {
 		t.Fatal(err)

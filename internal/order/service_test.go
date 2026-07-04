@@ -19,6 +19,20 @@ type MockOrderRepo struct {
 	orders map[string]*LimitOrder
 }
 
+func (r *MockOrderRepo) GetByIDForUpdate(ctx context.Context, id string) (*LimitOrder, error) {
+	return r.GetByID(ctx, id)
+}
+
+func (r *MockOrderRepo) CancelOtherListed(ctx context.Context, itemID, exceptOrderID string) error {
+	for _, o := range r.orders {
+		if o.ItemID == itemID && o.ID != exceptOrderID && o.Status == Listed {
+			o.Status = Canceled
+		}
+	}
+
+	return nil
+}
+
 func (r *MockOrderRepo) RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
 	return fn(ctx)
 }
@@ -86,15 +100,15 @@ type MockItemService struct {
 	items map[string]*item.Item
 }
 
-func (s *MockItemService) TransferOwnership(ctx context.Context, itemID string, guildId string) error {
+func (s *MockItemService) TransferOwnership(ctx context.Context, itemID, sellerID, buyerID string) error {
 	i, ok := s.items[itemID]
 	if !ok {
 		return fmt.Errorf("item %v not found", itemID)
 	}
-	if i.OwnerID == guildId {
-		return fmt.Errorf("guild %v already owns %v", guildId, itemID)
+	if i.OwnerID == buyerID {
+		return fmt.Errorf("guild %v already owns %v", buyerID, itemID)
 	}
-	i.OwnerID = guildId
+	i.OwnerID = buyerID
 	return nil
 }
 
@@ -104,6 +118,9 @@ func (s *MockItemService) GetItem(ctx context.Context, itemID string) (*item.Ite
 		return nil, fmt.Errorf("item %v not found", itemID)
 	}
 	return i, nil
+}
+func (m *MockItemService) GetItemForUpdate(ctx context.Context, id string) (*item.Item, error) {
+	return m.GetItem(ctx, id)
 }
 
 func (s *MockItemService) UpdateItem(ctx context.Context, item *item.Item) error {
@@ -143,7 +160,7 @@ func defaultGuilds() map[string]*guild.Guild {
 
 func defaultItem() map[string]*item.Item {
 	return map[string]*item.Item{
-		itemID:  {ID: itemID, Name: "Sword", Type: item.Common, OwnerID: sellerID, Status: item.Free, BasePrice: 100},
+		itemID:  {ID: itemID, Name: "Sword", Type: item.Common, OwnerID: sellerID, Status: item.ListedInOrder, BasePrice: 100},
 		item2ID: {ID: item2ID, Name: "Knife", Type: item.Common, OwnerID: sellerID, Status: item.Free, BasePrice: 100},
 		item3ID: {
 			ID:        item3ID,

@@ -18,7 +18,7 @@ var (
 )
 
 func LoadMigration(filename string) (string, error) {
-	data, err := os.ReadFile(filepath.Join("../../migrations", filename))
+	data, err := os.ReadFile(filepath.Join("../../migrations/up", filename))
 	if err != nil {
 		return "", fmt.Errorf("migration not found: %s: %w", filename, err)
 	}
@@ -75,6 +75,7 @@ func TestMain(m *testing.M) {
 		"000005_add_status_to_items_table.up.sql",
 		"000006_create_auctions_table.up.sql",
 		"000007_create_bids_table.up.sql",
+		"000008_restore_items_available.up.sql",
 	}
 
 	for _, migFile := range migrations {

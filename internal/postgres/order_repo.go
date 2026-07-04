@@ -25,6 +25,26 @@ func (r *OrderRepository) Create(ctx context.Context, o *order.LimitOrder) error
 	return err
 }
 
+func (r *OrderRepository) GetByIDForUpdate(ctx context.Context, id string) (*order.LimitOrder, error) {
+	q := r.conn(ctx)
+	row := q.QueryRowContext(ctx, `
+	SELECT id, item_id, seller_id, buyer_id, price, status, listed_at FROM limit_orders WHERE id = $1 FOR UPDATE`, id)
+
+	var o order.LimitOrder
+	var buyerID sql.NullString
+	err := row.Scan(&o.ID, &o.ItemID, &o.SellerID, &buyerID, &o.Price, &o.Status, &o.ListedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, order.ErrOrderNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if buyerID.Valid {
+		o.BuyerID = &buyerID.String
+	}
+	return &o, nil
+}
+
 func (r *OrderRepository) GetByID(ctx context.Context, id string) (*order.LimitOrder, error) {
 	q := r.conn(ctx)
 	row := q.QueryRowContext(ctx, `
@@ -80,6 +100,20 @@ func (r *OrderRepository) Update(ctx context.Context, o *order.LimitOrder) error
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (r *OrderRepository) CancelOtherListed(ctx context.Context, itemID, exceptOrderID string) error {
+	q := r.conn(ctx)
+	_, err := q.ExecContext(ctx, `UPDATE limit_orders
+	SET status = 'canceled'
+	WHERE item_id = $1
+    AND id <> $2	
+    AND status = 'listed';`, itemID, exceptOrderID)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

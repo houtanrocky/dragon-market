@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"market-dragon/internal/item"
 )
@@ -16,15 +17,10 @@ func NewItemRepository(db *sql.DB) *ItemRepository {
 }
 
 func (r *ItemRepository) GetByID(ctx context.Context, id string) (*item.Item, error) {
+	q := r.itemConn(ctx)
 	var row *sql.Row
-	// TODO: excessive if/else must be refactored
-	if tx := getTx(ctx); tx != nil {
-		row = tx.QueryRowContext(ctx, `SELECT id, name, type, owner_id, status, base_price 
+	row = q.QueryRowContext(ctx, `SELECT id, name, type, owner_id, status, base_price 
 		FROM items WHERE id = $1`, id)
-	} else {
-		row = r.db.QueryRowContext(ctx, `SELECT id, name, type, owner_id, status, base_price 
-		FROM items WHERE id = $1`, id)
-	}
 
 	var it item.Item
 	err := row.Scan(&it.ID, &it.Name, &it.Type, &it.OwnerID, &it.Status, &it.BasePrice)
@@ -36,18 +32,11 @@ func (r *ItemRepository) GetByID(ctx context.Context, id string) (*item.Item, er
 }
 
 func (r *ItemRepository) Update(ctx context.Context, i *item.Item) error {
-	var err error
-	if tx := getTx(ctx); tx != nil {
-		_, err = tx.ExecContext(ctx, `UPDATE items 
+	q := r.itemConn(ctx)
+	_, err := q.ExecContext(ctx, `UPDATE items 
 		SET name = $1, type = $2, owner_id = $3, status = $4, base_price = $5
 		WHERE id = $6
 		`, i.Name, i.Type, i.OwnerID, i.Status, i.BasePrice, i.ID)
-	} else {
-		_, err = r.db.ExecContext(ctx, `UPDATE items 
-		SET name = $1, type = $2, owner_id = $3, status = $4, base_price = $5
-		WHERE id = $6
-		`, i.Name, i.Type, i.OwnerID, i.Status, i.BasePrice, i.ID)
-	}
 	if err != nil {
 		return err
 	}
@@ -55,16 +44,10 @@ func (r *ItemRepository) Update(ctx context.Context, i *item.Item) error {
 }
 
 func (r *ItemRepository) ListFree(ctx context.Context) ([]*item.Item, error) {
-	var rows *sql.Rows
-	var err error
+	q := r.itemConn(ctx)
 
-	if tx := getTx(ctx); tx != nil {
-		rows, err = tx.QueryContext(ctx, `SELECT id, name, type, owner_id, status, base_price 
+	rows, err := q.QueryContext(ctx, `SELECT id, name, type, owner_id, status, base_price 
 		FROM items WHERE status = 'free'`)
-	} else {
-		rows, err = r.db.QueryContext(ctx, `SELECT id, name, type, owner_id, status, base_price 
-		FROM items WHERE status = 'free'`)
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -132,6 +115,53 @@ func (r *ItemRepository) TransferFromAuction(ctx context.Context, id, sellerID, 
 	if rows != 1 {
 		return fmt.Errorf("item cannot be transferred from auction")
 	}
+	return nil
+}
+
+func (r *ItemRepository) GetItemForUpdate(ctx context.Context, itemID string) (*item.Item, error) {
+	q := r.itemConn(ctx)
+	var row *sql.Row
+	row = q.QueryRowContext(ctx, `SELECT id, name, type, owner_id, status, base_price 
+		FROM items WHERE id = $1 FOR UPDATE`, itemID)
+
+	var it item.Item
+	err := row.Scan(&it.ID, &it.Name, &it.Type, &it.OwnerID, &it.Status, &it.BasePrice)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, item.ErrItemNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &it, nil
+}
+
+func (r *ItemRepository) TransferFromOrder(
+	ctx context.Context,
+	itemID, sellerID, buyerID string,
+) error {
+	result, err := r.itemConn(ctx).ExecContext(ctx, `
+                UPDATE items
+                SET owner_id = $3, status = 'free'
+                WHERE id = $1
+                  AND owner_id = $2
+                  AND status = 'listed_in_order'`,
+		itemID,
+		sellerID,
+		buyerID,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return fmt.Errorf("item cannot be transferred from order")
+	}
+
 	return nil
 }
 

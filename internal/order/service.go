@@ -23,8 +23,9 @@ type WalletService interface {
 }
 
 type ItemService interface {
-	TransferOwnership(ctx context.Context, itemId string, guildId string) error
+	TransferOwnership(ctx context.Context, itemId string, sellerID string, buyerID string) error
 	GetItem(ctx context.Context, itemID string) (*item.Item, error)
+	GetItemForUpdate(ctx context.Context, itemID string) (*item.Item, error)
 	UpdateItem(ctx context.Context, item *item.Item) error
 }
 
@@ -58,7 +59,7 @@ func (s *OrderServiceImpl) List(ctx context.Context, itemID, sellerID string, pr
 
 	var order *LimitOrder
 	err := s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
-		it, err := s.itemSvc.GetItem(ctx, itemID)
+		it, err := s.itemSvc.GetItemForUpdate(ctx, itemID)
 		if err != nil {
 			return err
 		}
@@ -98,11 +99,31 @@ func (s *OrderServiceImpl) Buy(ctx context.Context, orderID, buyerID string) err
 		if err != nil {
 			return err
 		}
+
+		it, err := s.itemSvc.GetItemForUpdate(ctx, o.ItemID)
+		if err != nil {
+			return err
+		}
+
+		o, err = s.repo.GetByIDForUpdate(ctx, orderID)
+		if err != nil {
+			return err
+		}
+
+		if o.ItemID != it.ID {
+			return fmt.Errorf("order item changed unexpectedly")
+		}
 		if o.Status != Listed {
 			return fmt.Errorf("cannot buy order with status %q", o.Status)
 		}
 		if o.SellerID == buyerID {
 			return fmt.Errorf("cannot buy your own listing")
+		}
+		if it.OwnerID != o.SellerID {
+			return fmt.Errorf("seller no longer owns item")
+		}
+		if it.Status != item.ListedInOrder {
+			return fmt.Errorf("item is not listed in an order")
 		}
 
 		o.BuyerID = &buyerID
@@ -114,12 +135,7 @@ func (s *OrderServiceImpl) Buy(ctx context.Context, orderID, buyerID string) err
 		if err = s.walletSvc.Earn(ctx, o.SellerID, o.Price); err != nil {
 			return err
 		}
-		if err = s.itemSvc.TransferOwnership(ctx, o.ItemID, buyerID); err != nil {
-			return err
-		}
-
-		otherListedOrders, err := s.repo.GetOrdersByItemIDAndStatus(ctx, o.ItemID, Listed)
-		if err != nil {
+		if err = s.itemSvc.TransferOwnership(ctx, o.ItemID, o.SellerID, buyerID); err != nil {
 			return err
 		}
 
@@ -127,42 +143,46 @@ func (s *OrderServiceImpl) Buy(ctx context.Context, orderID, buyerID string) err
 			return err
 		}
 
-		for _, order := range otherListedOrders {
-			err := s.Cancel(ctx, order.ID, order.SellerID)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
+		return s.repo.CancelOtherListed(ctx, o.ItemID, o.ID)
 	})
 }
 
 func (s *OrderServiceImpl) Cancel(ctx context.Context, orderID, sellerID string) error {
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
-		order, err := s.repo.GetByID(ctx, orderID)
+		o, err := s.repo.GetByID(ctx, orderID)
 		if err != nil {
 			return err
 		}
-		if order.SellerID != sellerID {
-			return fmt.Errorf("cannot cancel an order listed by another seller")
-		}
-		if order.Status != Listed {
-			return fmt.Errorf("cannot cancel order with status %q", order.Status)
-		}
 
-		order.Status = Canceled
-		if err = s.repo.Update(ctx, order); err != nil {
+		_, err = s.itemSvc.GetItemForUpdate(ctx, o.ItemID)
+		if err != nil {
 			return err
 		}
 
-		otherListings, err := s.repo.GetOrdersByItemIDAndStatus(ctx, order.ItemID, Listed)
+		o, err = s.repo.GetByIDForUpdate(ctx, orderID)
+		if err != nil {
+			return err
+		}
+
+		if o.SellerID != sellerID {
+			return fmt.Errorf("cannot cancel an order listed by another seller")
+		}
+		if o.Status != Listed {
+			return fmt.Errorf("cannot cancel order with status %q", o.Status)
+		}
+
+		o.Status = Canceled
+		if err = s.repo.Update(ctx, o); err != nil {
+			return err
+		}
+
+		otherListings, err := s.repo.GetOrdersByItemIDAndStatus(ctx, o.ItemID, Listed)
 		if err != nil {
 			return err
 		}
 
 		if len(otherListings) == 0 {
-			it, err := s.itemSvc.GetItem(ctx, order.ItemID)
+			it, err := s.itemSvc.GetItem(ctx, o.ItemID)
 			if err != nil {
 				return err
 			}

@@ -20,7 +20,7 @@ type WalletService interface {
 }
 
 type ItemService interface {
-	Get(ctx context.Context, itemID string) (*item.Item, error)
+	GetItem(ctx context.Context, itemID string) (*item.Item, error)
 	MarkListedInAuction(ctx context.Context, itemID, sellerID string) error
 	TransferFromAuction(ctx context.Context, itemID, sellerID, winnerID string) error
 	ReleaseFromAuction(ctx context.Context, itemID string) error
@@ -81,7 +81,7 @@ func NewAuctionService(repo AuctionRepository, wallet WalletService, items ItemS
 func (s *AuctionServiceImpl) StartAuction(ctx context.Context, itemID, sellerID string) (*Auction, error) {
 	var created *Auction
 	err := s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
-		it, err := s.itemService.Get(ctx, itemID)
+		it, err := s.itemService.GetItem(ctx, itemID)
 		if err != nil {
 			return err
 		}

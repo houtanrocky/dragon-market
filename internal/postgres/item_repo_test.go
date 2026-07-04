@@ -207,7 +207,7 @@ func TestItemRepository_GetAndUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Get updated item
+	// GetItem updated item
 	updated, err := repo.GetByID(ctx, it.ID)
 	if err != nil {
 		t.Fatal(err)

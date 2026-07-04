@@ -165,7 +165,7 @@ func newMockItems() *mockItems {
 	}}}
 }
 
-func (s *mockItems) Get(_ context.Context, id string) (*item.Item, error) {
+func (s *mockItems) GetItem(_ context.Context, id string) (*item.Item, error) {
 	it := s.items[id]
 	if it == nil {
 		return nil, item.ErrItemNotFound

@@ -2,11 +2,28 @@ package item
 
 import (
 	"context"
+	"fmt"
 	"testing"
 )
 
 type MockItemRepository struct {
 	items map[string]*Item
+}
+
+func (r MockItemRepository) GetItemForUpdate(ctx context.Context, id string) (*Item, error) {
+	return r.GetByID(ctx, id)
+}
+
+func (r MockItemRepository) TransferFromOrder(ctx context.Context, itemID, sellerID, buyerID string) error {
+	if r.items[itemID].OwnerID != sellerID {
+		return fmt.Errorf("cannot sell item not owned")
+	}
+	if buyerID == "" {
+		return fmt.Errorf("buyer empty")
+	}
+	r.items[itemID].OwnerID = buyerID
+
+	return nil
 }
 
 func (r MockItemRepository) GetByID(ctx context.Context, id string) (*Item, error) {
@@ -83,7 +100,7 @@ func TestService_Get_Success(t *testing.T) {
 	ctx := context.Background()
 	svc := NewItemService(repo)
 
-	i, err := svc.Get(ctx, testInitialItemID)
+	i, err := svc.GetItem(ctx, testInitialItemID)
 	if err != nil {
 		t.Error(err)
 	}
