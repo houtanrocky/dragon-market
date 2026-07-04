@@ -17,16 +17,6 @@ type guildHandler struct {
 }
 
 // GET /guilds/{id}/wallet
-func (h *guildHandler) Reserve(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	id := "..."
-	amount := 100
-
-	if err := h.svc.Reserve(ctx, id, gold.Amount(amount)); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
+func (h *guildHandler) Get(w http.ResponseWriter, r *http.Request) {
+	panic("implement me")
 }
