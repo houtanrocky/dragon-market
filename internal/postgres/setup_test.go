@@ -74,7 +74,7 @@ func TestMain(m *testing.M) {
 		"000004_create_limit_orders_table.up.sql",
 		"000005_add_status_to_items_table.up.sql",
 		"000006_create_auctions_table.up.sql",
-		"000008_create_bids_table.up.sql",
+		"000007_create_bids_table.up.sql",
 	}
 
 	for _, migFile := range migrations {
