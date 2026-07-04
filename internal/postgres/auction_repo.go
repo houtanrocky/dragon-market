@@ -15,11 +15,11 @@ package postgres
 //	return &AuctionRepository{db: db}
 //}
 //
-//func (r *AuctionRepository) Create(ctx context.Context, a *auction.Auction) error {
+//func (r *AuctionRepository) CreateAuction(ctx context.Context, a *auction.Auction) error {
 //	panic("implement me")
 //}
 //
-//func (r *AuctionRepository) GetByID(ctx context.Context, id string) (*auction.Auction, error) {
+//func (r *AuctionRepository) GetAuctionByID(ctx context.Context, id string) (*auction.Auction, error) {
 //	panic("implement me")
 //}
 //

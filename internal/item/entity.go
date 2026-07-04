@@ -1,5 +1,7 @@
 package item
 
+import "market-dragon/internal/gold"
+
 type Type string
 
 const (
@@ -22,5 +24,5 @@ type Item struct {
 	Type      Type
 	OwnerID   string // guild ID
 	Status    Status
-	BasePrice float64
+	BasePrice gold.Amount
 }

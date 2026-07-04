@@ -1,6 +1,9 @@
 package order
 
-import "time"
+import (
+	"market-dragon/internal/gold"
+	"time"
+)
 
 type Status string
 
@@ -16,7 +19,7 @@ type LimitOrder struct {
 	ItemID   string
 	SellerID string
 	BuyerID  *string // nil until sold
-	Price    float64
+	Price    gold.Amount
 	Status   Status
 	ListedAt time.Time
 }

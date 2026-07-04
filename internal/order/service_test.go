@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"market-dragon/internal/gold"
 	"market-dragon/internal/guild"
 	"market-dragon/internal/item"
 	"testing"
@@ -56,7 +57,7 @@ type MockWalletService struct {
 	guilds map[string]*guild.Guild
 }
 
-func (s *MockWalletService) Spend(ctx context.Context, id string, amount float64) error {
+func (s *MockWalletService) Spend(ctx context.Context, id string, amount gold.Amount) error {
 	g, ok := s.guilds[id]
 	if !ok {
 		return fmt.Errorf("guild not found")
@@ -71,7 +72,7 @@ func (s *MockWalletService) Spend(ctx context.Context, id string, amount float64
 	return nil
 }
 
-func (s *MockWalletService) Earn(ctx context.Context, id string, amount float64) error {
+func (s *MockWalletService) Earn(ctx context.Context, id string, amount gold.Amount) error {
 	g, ok := s.guilds[id]
 	if !ok {
 		return fmt.Errorf("guild not found")
@@ -155,7 +156,7 @@ func defaultItem() map[string]*item.Item {
 	}
 }
 
-func listedOrder(price float64) *LimitOrder {
+func listedOrder(price gold.Amount) *LimitOrder {
 	return &LimitOrder{
 		ID:       orderID,
 		ItemID:   itemID,
@@ -242,7 +243,7 @@ func TestService_List_ItemListedInAuction(t *testing.T) {
 
 func TestService_Buy_Success(t *testing.T) {
 	ctx := context.Background()
-	price := float64(2000)
+	price := gold.Amount(2000)
 	oRepo := &MockOrderRepo{orders: map[string]*LimitOrder{orderID: listedOrder(price)}}
 	r := &MockOrderRepo{orders: map[string]*LimitOrder{}}
 

@@ -48,13 +48,13 @@ func TestOrderRepository_CreateGetUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Test GetByID
+	// Test GetAuctionByID
 	got, err := repo.GetByID(ctx, "order-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.ID != o.ID || got.ItemID != o.ItemID || got.SellerID != o.SellerID || got.Price != o.Price || got.Status != o.Status {
-		t.Errorf("GetByID returned unexpected order: %+v", got)
+		t.Errorf("GetAuctionByID returned unexpected order: %+v", got)
 	}
 	if got.BuyerID != nil {
 		t.Error("expected BuyerID to be nil, got", *got.BuyerID)

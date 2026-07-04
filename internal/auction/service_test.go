@@ -3,6 +3,7 @@ package auction
 import (
 	"context"
 	"fmt"
+	"market-dragon/internal/gold"
 	"market-dragon/internal/guild"
 	"market-dragon/internal/item"
 	"testing"
@@ -14,12 +15,56 @@ type MockAuctionRepository struct {
 	bids     map[string]*Bid
 }
 
-func (r *MockAuctionRepository) Create(ctx context.Context, a *Auction) error {
+func (r *MockAuctionRepository) GetTopActiveBid(ctx context.Context, auctionID string) (*Bid, error) {
+	var topB *Bid
+	for _, bid := range r.bids {
+		if bid.Status != ActiveBid {
+			continue
+		}
+		if topB == nil || bid.Amount > topB.Amount {
+			topB = bid
+		}
+	}
+	if topB == nil {
+		return nil, fmt.Errorf("no active bids found")
+	}
+	return topB, nil
+}
+
+func (r *MockAuctionRepository) CancelActiveBid(ctx context.Context, auctionID string, bidID string, bidderID string) error {
+	b, err := r.GetBidByID(ctx, bidID)
+	if err != nil {
+		return err
+	}
+	if b.AuctionID != auctionID {
+		return fmt.Errorf("bid does not belong to auction")
+	}
+	if b.BidderID != bidderID {
+		return fmt.Errorf("bid does not belong to bidder")
+	}
+	if b.Status != ActiveBid {
+		return fmt.Errorf("bid is not active")
+	}
+
+	b.Status = CancelledBid
+	return nil
+}
+
+func (r *MockAuctionRepository) GetBidByID(ctx context.Context, bidID string) (*Bid, error) {
+	b, ok := r.bids[bidID]
+	if !ok {
+		return nil, fmt.Errorf("bid not found")
+	}
+
+	return b, nil
+}
+
+func (r *MockAuctionRepository) CreateAuction(ctx context.Context, a *Auction) error {
 	r.auctions[a.ID] = a
 	return nil
 }
 
-func (r *MockAuctionRepository) GetByID(ctx context.Context, id string) (*Auction, error) {
+func (r *MockAuctionRepository) GetAuctionByID(ctx context.Context, id string) (*Auction, error) {
 	a, ok := r.auctions[id]
 	if !ok {
 		return nil, fmt.Errorf("auction with id: %v not found", id)
@@ -63,21 +108,6 @@ func (r *MockAuctionRepository) PlaceBid(ctx context.Context, b *Bid) error {
 	return nil
 }
 
-func (r *MockAuctionRepository) GetTopBid(ctx context.Context, auctionID string) (*Bid, error) {
-	var topB *Bid
-	var topBidAmount float64 = -1
-	for _, bid := range r.bids {
-		if bid.AuctionID == auctionID && bid.Amount > topBidAmount {
-			topBidAmount = bid.Amount
-			topB = bid
-		}
-	}
-	if topBidAmount == -1 {
-		return nil, fmt.Errorf("no bid found")
-	}
-	return topB, nil
-}
-
 func (r *MockAuctionRepository) GetBidsByAuction(ctx context.Context, auctionID string) ([]*Bid, error) {
 	var bids []*Bid
 	for _, bid := range r.bids {
@@ -106,7 +136,7 @@ type MockWalletService struct {
 	guilds map[string]*guild.Guild
 }
 
-func (s *MockWalletService) Spend(ctx context.Context, id string, amount float64) error {
+func (s *MockWalletService) Spend(ctx context.Context, id string, amount gold.Amount) error {
 	g, ok := s.guilds[id]
 	if !ok {
 		return fmt.Errorf("guild not found")
@@ -121,7 +151,7 @@ func (s *MockWalletService) Spend(ctx context.Context, id string, amount float64
 	return nil
 }
 
-func (s *MockWalletService) Earn(ctx context.Context, id string, amount float64) error {
+func (s *MockWalletService) Earn(ctx context.Context, id string, amount gold.Amount) error {
 	g, ok := s.guilds[id]
 	if !ok {
 		return fmt.Errorf("guild not found")
@@ -134,13 +164,13 @@ func NewMockWalletService() *MockWalletService {
 	return &MockWalletService{}
 }
 
-func (s *MockWalletService) Reserve(ctx context.Context, id string, amount float64) error {
+func (s *MockWalletService) Reserve(ctx context.Context, id string, amount gold.Amount) error {
 	return nil
 }
-func (s *MockWalletService) Release(ctx context.Context, id string, amount float64) error {
+func (s *MockWalletService) Release(ctx context.Context, id string, amount gold.Amount) error {
 	return nil
 }
-func (s *MockWalletService) Deduct(ctx context.Context, id string, amount float64) error {
+func (s *MockWalletService) Deduct(ctx context.Context, id string, amount gold.Amount) error {
 	return nil
 }
 
@@ -182,8 +212,8 @@ const (
 
 	BidID   = "bid-1"
 	BidID2  = "bid-2"
-	Amount  = 100
-	Amount2 = 105
+	Amount  = gold.Amount(100)
+	Amount2 = gold.Amount(105)
 )
 
 func defaultAuction() map[string]*Auction {
@@ -244,7 +274,7 @@ func TestService_StartAuction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	createdAuction, err := aSvc.repo.GetByID(ctx, a.ID)
+	createdAuction, err := aSvc.repo.GetAuctionByID(ctx, a.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +363,7 @@ func TestService_EndAuction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a, err := aSvc.repo.GetByID(ctx, AuctionID)
+	a, err := aSvc.repo.GetAuctionByID(ctx, AuctionID)
 	if err != nil {
 		t.Fatal()
 	}

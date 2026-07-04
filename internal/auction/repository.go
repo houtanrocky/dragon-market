@@ -3,8 +3,8 @@ package auction
 import "context"
 
 type AuctionRepository interface {
-	Create(ctx context.Context, a *Auction) error
-	GetByID(ctx context.Context, id string) (*Auction, error)
+	CreateAuction(ctx context.Context, a *Auction) error
+	GetAuctionByID(ctx context.Context, id string) (*Auction, error)
 	GetActiveByItemID(ctx context.Context, itemID string) (*Auction, error)
 	Update(ctx context.Context, a *Auction) error
 

@@ -3,6 +3,7 @@ package order
 import (
 	"context"
 	"fmt"
+	"market-dragon/internal/gold"
 	"market-dragon/internal/item"
 	"time"
 
@@ -17,8 +18,8 @@ type Transactor interface {
 }
 
 type WalletService interface {
-	Spend(ctx context.Context, id string, amount float64) error
-	Earn(ctx context.Context, id string, amount float64) error
+	Spend(ctx context.Context, id string, amount gold.Amount) error
+	Earn(ctx context.Context, id string, amount gold.Amount) error
 }
 
 type ItemService interface {
@@ -28,7 +29,7 @@ type ItemService interface {
 }
 
 type OrderService interface {
-	List(ctx context.Context, itemID, sellerID string, price float64) (*LimitOrder, error)
+	List(ctx context.Context, itemID, sellerID string, price gold.Amount) (*LimitOrder, error)
 	Buy(ctx context.Context, orderID, buyerID string) error
 	Cancel(ctx context.Context, orderID, sellerID string) error
 }
@@ -50,7 +51,7 @@ func NewOrderService(r OrderRepository, wSvc WalletService, iSvc ItemService, t 
 	}
 }
 
-func (s *OrderServiceImpl) List(ctx context.Context, itemID, sellerID string, price float64) (*LimitOrder, error) {
+func (s *OrderServiceImpl) List(ctx context.Context, itemID, sellerID string, price gold.Amount) (*LimitOrder, error) {
 	if price <= 0 {
 		return nil, fmt.Errorf("price must be positive, got %v", price)
 	}

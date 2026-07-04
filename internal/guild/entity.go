@@ -1,9 +1,11 @@
 package guild
 
+import "market-dragon/internal/gold"
+
 type Guild struct {
 	ID         string
-	Gold       int64
-	Reserved   int64
-	DailyLimit int64 // max gold committable per day
-	DailySpent int64 // gold committed today (purchases + reservations)
+	Gold       gold.Amount
+	Reserved   gold.Amount
+	DailyLimit gold.Amount // max gold committable per day
+	DailySpent gold.Amount // gold committed today (purchases + reservations)
 }

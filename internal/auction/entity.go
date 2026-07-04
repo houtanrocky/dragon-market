@@ -1,6 +1,9 @@
 package auction
 
-import "time"
+import (
+	"market-dragon/internal/gold"
+	"time"
+)
 
 type AuctionStatus string
 type BidStatus string
@@ -27,7 +30,7 @@ type Bid struct {
 	ID        string
 	AuctionID string
 	BidderID  string
-	Amount    float64
+	Amount    gold.Amount
 	PlacedAt  time.Time
 	Status    BidStatus // "active", "cancelled"
 }

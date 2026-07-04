@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"market-dragon/internal/gold"
 )
 
 type Transactor interface {
@@ -22,9 +23,9 @@ func NewWalletService(r GuildRepository, tx Transactor) *WalletServiceImpl {
 	return &WalletServiceImpl{guildRepository: r, tx: tx}
 }
 
-func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount int64) error {
+func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount gold.Amount) error {
 	if amount <= 0 {
-		return fmt.Errorf("amount negative")
+		return fmt.Errorf("amount must be positive")
 	}
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
@@ -49,9 +50,9 @@ func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount int64
 	})
 }
 
-func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount int64) error {
+func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount gold.Amount) error {
 	if amount <= 0 {
-		return fmt.Errorf("amount negative")
+		return fmt.Errorf("amount must be positive")
 	}
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
@@ -69,18 +70,15 @@ func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount int64)
 		if amount > g.Gold {
 			return fmt.Errorf("insufficient gold")
 		}
-		if g.Reserved < amount {
-			return fmt.Errorf("cannot deduct, only %v is reserved, need %v", g.Reserved, amount)
-		}
 		g.Reserved -= amount
 		g.Gold -= amount
 		return repo.Update(ctx, g)
 	})
 }
 
-func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount int64) error {
+func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount gold.Amount) error {
 	if amount <= 0 {
-		return fmt.Errorf("amount negative")
+		return fmt.Errorf("amount must be positive")
 	}
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
@@ -107,9 +105,9 @@ func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount int64
 	})
 }
 
-func (s *WalletServiceImpl) Earn(ctx context.Context, id string, amount int64) error {
+func (s *WalletServiceImpl) Earn(ctx context.Context, id string, amount gold.Amount) error {
 	if amount <= 0 {
-		return fmt.Errorf("amount negative")
+		return fmt.Errorf("amount must be positive")
 	}
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
@@ -126,9 +124,9 @@ func (s *WalletServiceImpl) Earn(ctx context.Context, id string, amount int64) e
 	})
 }
 
-func (s *WalletServiceImpl) Spend(ctx context.Context, id string, amount int64) error {
+func (s *WalletServiceImpl) Spend(ctx context.Context, id string, amount gold.Amount) error {
 	if amount <= 0 {
-		return fmt.Errorf("amount negative")
+		return fmt.Errorf("amount must be positive")
 	}
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository

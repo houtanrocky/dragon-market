@@ -3,17 +3,18 @@ package auction
 import (
 	"context"
 	"fmt"
+	"market-dragon/internal/gold"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type WalletService interface {
-	Reserve(ctx context.Context, id string, amount float64) error
-	Release(ctx context.Context, id string, amount float64) error
-	Deduct(ctx context.Context, id string, amount float64) error
-	Earn(ctx context.Context, id string, amount float64) error
-	Spend(ctx context.Context, id string, amount float64) error
+	Reserve(ctx context.Context, id string, amount gold.Amount) error
+	Release(ctx context.Context, id string, amount gold.Amount) error
+	Deduct(ctx context.Context, id string, amount gold.Amount) error
+	Earn(ctx context.Context, id string, amount gold.Amount) error
+	Spend(ctx context.Context, id string, amount gold.Amount) error
 }
 
 type ItemService interface {
@@ -53,11 +54,11 @@ func (s *AuctionServiceImpl) StartAuction(ctx context.Context, itemID, sellerID 
 		Status:   ActiveAuction,
 	}
 	fmt.Println(a)
-	//s.repo.Create()
+	//s.repo.CreateAuction()
 	return nil, nil
 }
 
-func (s *AuctionServiceImpl) PlaceBid(ctx context.Context, auctionID, bidderID string, amount float64) error {
+func (s *AuctionServiceImpl) PlaceBid(ctx context.Context, auctionID, bidderID string, amount gold.Amount) error {
 	err := s.repo.PlaceBid(ctx, &Bid{
 		ID:        uuid.New().String(),
 		AuctionID: auctionID,
@@ -76,7 +77,7 @@ func (s *AuctionServiceImpl) PlaceBid(ctx context.Context, auctionID, bidderID s
 func (s *AuctionServiceImpl) CancelBid(ctx context.Context, auctionID, bidID, bidderID string) error {
 	err := s.tx.RunInTransaction(ctx,
 		func(ctx context.Context) error {
-			a, err := s.repo.GetByID(ctx, auctionID)
+			a, err := s.repo.GetAuctionByID(ctx, auctionID)
 			if err != nil {
 				return err
 			}
