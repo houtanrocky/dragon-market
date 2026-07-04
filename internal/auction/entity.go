@@ -1,8 +1,9 @@
 package auction
 
 import (
-	"market-dragon/internal/gold"
 	"time"
+
+	"market-dragon/internal/gold"
 )
 
 type AuctionStatus string
@@ -15,7 +16,9 @@ const (
 
 const (
 	ActiveBid    BidStatus = "active"
+	OutbidBid    BidStatus = "outbid"
 	CancelledBid BidStatus = "cancelled"
+	WinningBid   BidStatus = "winning"
 )
 
 type Auction struct {
@@ -32,5 +35,5 @@ type Bid struct {
 	BidderID  string
 	Amount    gold.Amount
 	PlacedAt  time.Time
-	Status    BidStatus // "active", "cancelled"
+	Status    BidStatus
 }
