@@ -2,6 +2,9 @@ package api
 
 import (
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 func NewRouter(
@@ -10,29 +13,30 @@ func NewRouter(
 	auctionSvc AuctionService,
 	orderSvc OrderService,
 ) http.Handler {
-	mux := http.NewServeMux()
+	r := chi.NewRouter()
+
+	r.Use(middleware.RequestID)
+	r.Use(middleware.Recoverer)
 
 	gh := &guildHandler{svc: guildSvc}
 	ih := &itemHandler{svc: itemSvc}
 	ah := &auctionHandler{svc: auctionSvc}
 	oh := &orderHandler{svc: orderSvc}
 
-	// Guild wallet
-	mux.HandleFunc("GET /guilds/{id}/wallet", gh.Reserve)
+	r.Get("/guilds/{id}/wallet", gh.Get)
 
-	// Items
-	mux.HandleFunc("GET /items", ih.List)
-	mux.HandleFunc("GET /items/{id}", ih.Get)
+	r.Post("/items", ih.Post)
+	r.Get("/items", ih.List)
+	r.Get("/items/{id}", ih.Get)
 
-	// Auctions (legendary only)
-	mux.HandleFunc("POST /auctions", ah.Start)
-	mux.HandleFunc("POST /auctions/{id}/bids", ah.PlaceBid)
-	mux.HandleFunc("DELETE /auctions/{auctionID}/bids/{bidID}", ah.CancelBid)
+	r.Post("/auctions", ah.Start)
+	r.Get("/auctions/{id}", ah.GetBid)
+	r.Post("/auctions/{id}/bids", ah.PlaceBid)
+	r.Delete("/auctions/{auctionID}/bids/{bidID}", ah.CancelBid)
 
-	// Limit orders (common + rare)
-	mux.HandleFunc("POST /orders", oh.Create)
-	mux.HandleFunc("POST /orders/{id}/buy", oh.Buy)
-	mux.HandleFunc("DELETE /orders/{id}", oh.Cancel)
+	r.Post("/orders", oh.Create)
+	r.Post("/orders/{id}/buy", oh.Buy)
+	r.Delete("/orders/{id}", oh.Cancel)
 
-	return mux
+	return r
 }
