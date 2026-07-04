@@ -10,6 +10,11 @@ type MockItemRepository struct {
 	items map[string]*Item
 }
 
+func (r MockItemRepository) Create(ctx context.Context, it *Item) error {
+	r.items[it.ID] = it
+	return nil
+}
+
 func (r MockItemRepository) GetItemForUpdate(ctx context.Context, id string) (*Item, error) {
 	return r.GetByID(ctx, id)
 }
@@ -77,6 +82,39 @@ func (r MockItemRepository) TransferFromAuction(ctx context.Context, id, sellerI
 }
 
 // ---------------------------- Tests ----------
+func TestItemService_Create(t *testing.T) {
+	const (
+		testInitialItemID    = "item-1"
+		testInitialItemName  = "Sussy Sword"
+		testInitialItemType  = Common
+		testInitialOwnerId   = "guild-1"
+		testInitialStatus    = Free
+		testInitialBasePrice = 1000
+	)
+
+	repo := &MockItemRepository{items: map[string]*Item{
+		testInitialItemID: {
+			ID:        testInitialItemID,
+			Name:      testInitialItemName,
+			Type:      testInitialItemType,
+			OwnerID:   testInitialOwnerId,
+			Status:    testInitialStatus,
+			BasePrice: testInitialBasePrice,
+		},
+	}}
+
+	ctx := context.Background()
+	svc := NewItemService(repo)
+
+	i, err := svc.Create(ctx, testInitialItemName, testInitialItemType, testInitialOwnerId, testInitialBasePrice)
+	if err != nil {
+		t.Error(err)
+	}
+	if i.Name != testInitialItemName {
+		t.Errorf("unexpected item %v", i)
+	}
+}
+
 func TestService_Get_Success(t *testing.T) {
 	const (
 		testInitialItemID    = "item-1"

@@ -2,16 +2,16 @@ package api
 
 import (
 	"context"
+	"market-dragon/internal/gold"
 	"net/http"
 
 	"market-dragon/internal/item"
 )
 
 type ItemService interface {
+	Create(ctx context.Context, name string, typ item.Type, ownerID string, basePrice gold.Amount) (*item.Item, error)
+	ListFree(ctx context.Context, itemID string) ([]*item.Item, error)
 	GetItem(ctx context.Context, itemID string) (*item.Item, error)
-	MarkListedInAuction(ctx context.Context, itemID, sellerID string) error
-	TransferFromAuction(ctx context.Context, itemID, sellerID, winnerID string) error
-	ReleaseFromAuction(ctx context.Context, itemID string) error
 }
 
 type itemHandler struct {
@@ -27,3 +27,6 @@ func (h *itemHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *itemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	panic("implement me")
 }
+
+// POST /items
+func (h *itemHandler) Post(w http.ResponseWriter, r *http.Request) { panic("implement me") }

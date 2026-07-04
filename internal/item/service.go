@@ -3,6 +3,9 @@ package item
 import (
 	"context"
 	"fmt"
+	"market-dragon/internal/gold"
+
+	"github.com/google/uuid"
 )
 
 //type ItemService interface {
@@ -79,4 +82,32 @@ func (s *ItemServiceImpl) TransferOwnership(
 		sellerID,
 		buyerID,
 	)
+}
+
+func (s *ItemServiceImpl) Create(ctx context.Context, name string, typ Type, ownerID string, basePrice gold.Amount) (*Item, error) {
+	if name == "" {
+		return nil, fmt.Errorf("name cannot be empty")
+	}
+	if !typ.IsValid() {
+		return nil, fmt.Errorf("invalid item type: %v", typ)
+	}
+	if ownerID == "" {
+		return nil, fmt.Errorf("ownerID cannot be empty")
+	}
+	if basePrice <= 0 {
+		return nil, fmt.Errorf("base price must be positive")
+	}
+	it := &Item{
+		ID:        uuid.New().String(),
+		Name:      name,
+		Type:      typ,
+		OwnerID:   ownerID,
+		Status:    Free,
+		BasePrice: basePrice,
+	}
+	err := s.itemRepository.Create(ctx, it)
+	if err != nil {
+		return nil, err
+	}
+	return it, nil
 }

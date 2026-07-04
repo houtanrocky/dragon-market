@@ -29,6 +29,10 @@ func (h *auctionHandler) PlaceBid(w http.ResponseWriter, r *http.Request) {
 	panic("implement me")
 }
 
+func (h *auctionHandler) GetBid(w http.ResponseWriter, r *http.Request) {
+	panic("implement me")
+}
+
 // CancelBid DELETE /auctions/{auctionID}/bids/{bidID}
 func (h *auctionHandler) CancelBid(w http.ResponseWriter, r *http.Request) {
 	panic("implement me")

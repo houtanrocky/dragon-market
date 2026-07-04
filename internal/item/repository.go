@@ -3,6 +3,7 @@ package item
 import "context"
 
 type ItemRepository interface {
+	Create(ctx context.Context, it *Item) error
 	GetByID(ctx context.Context, id string) (*Item, error)
 	GetItemForUpdate(ctx context.Context, id string) (*Item, error)
 	Update(ctx context.Context, item *Item) error

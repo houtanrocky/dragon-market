@@ -120,8 +120,7 @@ func (r *ItemRepository) TransferFromAuction(ctx context.Context, id, sellerID, 
 
 func (r *ItemRepository) GetItemForUpdate(ctx context.Context, itemID string) (*item.Item, error) {
 	q := r.itemConn(ctx)
-	var row *sql.Row
-	row = q.QueryRowContext(ctx, `SELECT id, name, type, owner_id, status, base_price 
+	row := q.QueryRowContext(ctx, `SELECT id, name, type, owner_id, status, base_price 
 		FROM items WHERE id = $1 FOR UPDATE`, itemID)
 
 	var it item.Item
@@ -160,6 +159,27 @@ func (r *ItemRepository) TransferFromOrder(
 	}
 	if rows != 1 {
 		return fmt.Errorf("item cannot be transferred from order")
+	}
+
+	return nil
+}
+
+func (r *ItemRepository) Create(ctx context.Context, it *item.Item) error {
+	q := r.itemConn(ctx)
+	execContext, err := q.ExecContext(ctx, `INSERT INTO items
+	    (id, name, type, owner_id, base_price, status)
+		VALUES($1, $2, $3, $4, $5, $6)`, it.ID, it.Name, it.Type, it.OwnerID, it.BasePrice, it.Status)
+	if err != nil {
+		return err
+	}
+
+	affected, err := execContext.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if affected != 1 {
+		return fmt.Errorf("expected one inserted item, got %d", affected)
 	}
 
 	return nil

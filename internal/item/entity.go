@@ -10,6 +10,14 @@ const (
 	Legendary Type = "legendary"
 )
 
+func (t Type) IsValid() bool {
+	switch t {
+	case Common, Rare, Legendary:
+		return true
+	}
+	return false
+}
+
 type Status string
 
 const (
