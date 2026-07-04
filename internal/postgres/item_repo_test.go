@@ -154,7 +154,7 @@ func TestItemRepository_GetAndUpdate(t *testing.T) {
 		testItemExpectedType      = item.Rare
 		testItemExpectedOwner     = "guild-2"
 		testItemExpectedStatus    = item.ListedInOrder
-		testItemExpectedBasePrice = 299.0
+		testItemExpectedBasePrice = 299
 	)
 
 	ctx := context.Background()
@@ -226,7 +226,7 @@ func TestItemRepository_GetAndUpdate(t *testing.T) {
 		t.Errorf("expected Status=%v, got %v", testItemExpectedStatus, updated.Status)
 	}
 	if updated.BasePrice != testItemExpectedBasePrice {
-		t.Errorf("expected BasePrice=%.2f, got %.2f", testItemExpectedBasePrice, updated.BasePrice)
+		t.Errorf("expected BasePrice=%v, got %v", testItemExpectedBasePrice, updated.BasePrice)
 	}
 
 }
