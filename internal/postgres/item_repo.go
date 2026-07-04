@@ -24,6 +24,9 @@ func (r *ItemRepository) GetByID(ctx context.Context, id string) (*item.Item, er
 
 	var it item.Item
 	err := row.Scan(&it.ID, &it.Name, &it.Type, &it.OwnerID, &it.Status, &it.BasePrice)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, item.ErrItemNotFound
+	}
 	if err != nil {
 		return nil, err
 	}

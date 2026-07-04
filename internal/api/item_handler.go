@@ -11,6 +11,8 @@ import (
 
 	"market-dragon/internal/gold"
 	"market-dragon/internal/item"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type ItemService interface {
@@ -44,6 +46,15 @@ func newItemResponse(it *item.Item) itemResponse {
 		Status:    it.Status,
 		BasePrice: it.BasePrice,
 	}
+}
+func newItemsResponse(items []*item.Item) []itemResponse {
+	responses := make([]itemResponse, 0, len(items))
+
+	for _, it := range items {
+		responses = append(responses, newItemResponse(it))
+	}
+
+	return responses
 }
 
 type itemHandler struct {
@@ -105,12 +116,49 @@ func (h *itemHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// GET /items
+// List GET /items
 func (h *itemHandler) List(w http.ResponseWriter, r *http.Request) {
-	panic("implement me")
+	items, err := h.svc.ListFree(r.Context())
+	if err != nil {
+		slog.Error("list free items", "error", err)
+		http.Error(w, "failed to list items", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(newItemsResponse(items)); err != nil {
+		slog.Error("encode item list response", "error", err)
+	}
 }
 
-// GET /items/{id}
+// Get /items/{id}
 func (h *itemHandler) Get(w http.ResponseWriter, r *http.Request) {
-	panic("implement me")
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "item ID is required", http.StatusBadRequest)
+		return
+	}
+
+	it, err := h.svc.GetItem(r.Context(), id)
+	if errors.Is(err, item.ErrItemNotFound) {
+		http.Error(w, "item not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		slog.Error("get item", "item_id", id, "error", err)
+		http.Error(w, "failed to get item", http.StatusInternalServerError)
+		return
+	}
+	if it == nil {
+		slog.Error("get item returned nil", "item_id", id)
+		http.Error(w, "failed to get item", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(newItemResponse(it)); err != nil {
+		slog.Error("encode item response", "error", err)
+	}
 }
