@@ -2,12 +2,22 @@ package item
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 )
 
 type MockItemRepository struct {
 	items map[string]*Item
+}
+
+type MockOwnerChecker struct {
+	exists bool
+	err    error
+}
+
+func (f MockOwnerChecker) GuildExists(context.Context, string) (bool, error) {
+	return f.exists, f.err
 }
 
 func (r MockItemRepository) Create(ctx context.Context, it *Item) error {
@@ -104,7 +114,7 @@ func TestItemService_Create(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewItemService(repo)
+	svc := NewItemService(repo, MockOwnerChecker{exists: true})
 
 	i, err := svc.Create(ctx, testInitialItemName, testInitialItemType, testInitialOwnerId, testInitialBasePrice)
 	if err != nil {
@@ -112,6 +122,38 @@ func TestItemService_Create(t *testing.T) {
 	}
 	if i.Name != testInitialItemName {
 		t.Errorf("unexpected item %v", i)
+	}
+}
+
+func TestItemService_Create_OwnerNotFound(t *testing.T) {
+	repo := &MockItemRepository{items: make(map[string]*Item)}
+	svc := NewItemService(repo, MockOwnerChecker{exists: false})
+
+	created, err := svc.Create(context.Background(), "Sword", Common, "missing-guild", 100)
+
+	if !errors.Is(err, ErrOwnerNotFound) {
+		t.Fatalf("expected ErrOwnerNotFound, got %v", err)
+	}
+	if created != nil {
+		t.Fatalf("expected no item, got %v", created)
+	}
+}
+
+func TestItemService_Create_OwnerLookupFailure(t *testing.T) {
+	repo := &MockItemRepository{items: make(map[string]*Item)}
+	lookupErr := errors.New("database unavailable")
+	svc := NewItemService(repo, MockOwnerChecker{err: lookupErr})
+
+	created, err := svc.Create(context.Background(), "Sword", Common, "guild-1", 100)
+
+	if !errors.Is(err, lookupErr) {
+		t.Fatalf("expected lookup error to be preserved, got %v", err)
+	}
+	if errors.Is(err, ErrOwnerNotFound) {
+		t.Fatalf("lookup failure must not be reported as owner not found")
+	}
+	if created != nil {
+		t.Fatalf("expected no item, got %v", created)
 	}
 }
 
@@ -136,7 +178,7 @@ func TestService_Get_Success(t *testing.T) {
 	}}
 
 	ctx := context.Background()
-	svc := NewItemService(repo)
+	svc := NewItemService(repo, MockOwnerChecker{exists: true})
 
 	i, err := svc.GetItem(ctx, testInitialItemID)
 	if err != nil {
@@ -162,7 +204,7 @@ func TestService_ListFree(t *testing.T) {
 
 	repo := &MockItemRepository{items: initialItems}
 	ctx := context.Background()
-	svc := NewItemService(repo)
+	svc := NewItemService(repo, MockOwnerChecker{exists: true})
 
 	// -------- Act ------------
 	items, err := svc.ListFree(ctx)

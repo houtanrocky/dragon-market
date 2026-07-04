@@ -27,7 +27,7 @@ func TestGuildRepository_GetAndUpdate(t *testing.T) {
 	ctx := context.Background()
 	setupTest(t, ctx)
 
-	repo := NewRepository(testDB)
+	repo := NewWalletRepository(testDB)
 
 	// Insert
 	_, err := testDB.ExecContext(
@@ -62,5 +62,34 @@ func TestGuildRepository_GetAndUpdate(t *testing.T) {
 	}
 	if updated.Gold != testExpectedGold {
 		t.Errorf("expected gold %v, got %v", testExpectedGold, updated.Gold)
+	}
+}
+
+func TestGuildRepository_GuildExists(t *testing.T) {
+	ctx := context.Background()
+	setupTest(t, ctx)
+
+	const guildID = "guild-1"
+	if _, err := testDB.ExecContext(ctx,
+		`INSERT INTO guilds (id) VALUES ($1)`, guildID); err != nil {
+		t.Fatal(err)
+	}
+
+	repo := NewWalletRepository(testDB)
+
+	exists, err := repo.GuildExists(ctx, guildID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists {
+		t.Fatal("expected guild to exist")
+	}
+
+	exists, err = repo.GuildExists(ctx, "missing-guild")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exists {
+		t.Fatal("expected missing guild not to exist")
 	}
 }

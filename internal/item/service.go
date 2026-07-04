@@ -3,9 +3,11 @@ package item
 import (
 	"context"
 	"fmt"
-	"market-dragon/internal/gold"
+	"strings"
 
 	"github.com/google/uuid"
+
+	"market-dragon/internal/gold"
 )
 
 //type ItemService interface {
@@ -15,10 +17,18 @@ import (
 
 type ItemServiceImpl struct {
 	itemRepository ItemRepository
+	ownerChecker   OwnerChecker
 }
 
-func NewItemService(r ItemRepository) *ItemServiceImpl {
-	return &ItemServiceImpl{itemRepository: r}
+type OwnerChecker interface {
+	GuildExists(ctx context.Context, guildID string) (bool, error)
+}
+
+func NewItemService(r ItemRepository, ownerChecker OwnerChecker) *ItemServiceImpl {
+	return &ItemServiceImpl{
+		itemRepository: r,
+		ownerChecker:   ownerChecker,
+	}
 }
 
 func (s *ItemServiceImpl) GetItem(ctx context.Context, id string) (*Item, error) {
@@ -85,18 +95,29 @@ func (s *ItemServiceImpl) TransferOwnership(
 }
 
 func (s *ItemServiceImpl) Create(ctx context.Context, name string, typ Type, ownerID string, basePrice gold.Amount) (*Item, error) {
+	name = strings.TrimSpace(name)
+	ownerID = strings.TrimSpace(ownerID)
 	if name == "" {
-		return nil, fmt.Errorf("name cannot be empty")
+		return nil, fmt.Errorf("%w: name cannot be empty", ErrInvalidItem)
 	}
 	if !typ.IsValid() {
-		return nil, fmt.Errorf("invalid item type: %v", typ)
+		return nil, fmt.Errorf("%w: invalid item type: %q", ErrInvalidItem, typ)
 	}
 	if ownerID == "" {
-		return nil, fmt.Errorf("ownerID cannot be empty")
+		return nil, fmt.Errorf("%w: owner ID cannot be empty", ErrInvalidItem)
 	}
 	if basePrice <= 0 {
-		return nil, fmt.Errorf("base price must be positive")
+		return nil, fmt.Errorf("%w: base price must be positive", ErrInvalidItem)
 	}
+
+	exists, err := s.ownerChecker.GuildExists(ctx, ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("check owner guild: %w", err)
+	}
+	if !exists {
+		return nil, ErrOwnerNotFound
+	}
+
 	it := &Item{
 		ID:        uuid.New().String(),
 		Name:      name,
@@ -105,8 +126,7 @@ func (s *ItemServiceImpl) Create(ctx context.Context, name string, typ Type, own
 		Status:    Free,
 		BasePrice: basePrice,
 	}
-	err := s.itemRepository.Create(ctx, it)
-	if err != nil {
+	if err := s.itemRepository.Create(ctx, it); err != nil {
 		return nil, err
 	}
 	return it, nil

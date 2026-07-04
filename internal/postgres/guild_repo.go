@@ -11,8 +11,20 @@ type Repository struct {
 	db *sql.DB
 }
 
-func NewRepository(db *sql.DB) *Repository {
+func NewWalletRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
+}
+
+func (r *Repository) GuildExists(ctx context.Context, guildID string) (bool, error) {
+	var exists bool
+	err := r.guildConn(ctx).QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM guilds WHERE id = $1
+		)`, guildID).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 func (r *Repository) Get(ctx context.Context, id string) (*guild.Guild, error) {
@@ -49,4 +61,11 @@ func (r *Repository) Update(ctx context.Context, val *guild.Guild) error {
 	}
 
 	return err
+}
+
+func (r *Repository) guildConn(ctx context.Context) querier {
+	if tx := getTx(ctx); tx != nil {
+		return tx
+	}
+	return r.db
 }

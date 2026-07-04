@@ -25,7 +25,7 @@ func NewRouter(
 
 	r.Get("/guilds/{id}/wallet", gh.Get)
 
-	r.Post("/items", ih.Post)
+	r.Post("/items", ih.Create)
 	r.Get("/items", ih.List)
 	r.Get("/items/{id}", ih.Get)
 
