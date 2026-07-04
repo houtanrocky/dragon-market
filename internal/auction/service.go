@@ -54,9 +54,9 @@ func WithClock(clock Clock) Option {
 	return func(service *AuctionServiceImpl) { service.clock = clock }
 }
 
-func WithConfig(config Config) Option {
-	return func(service *AuctionServiceImpl) { service.config = config }
-}
+//func WithConfig(config Config) Option {
+//	return func(service *AuctionServiceImpl) { service.config = config }
+//}
 
 type AuctionServiceImpl struct {
 	repo          AuctionRepository

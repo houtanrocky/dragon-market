@@ -72,7 +72,12 @@ func (r *OrderRepository) GetOrdersByItemIDAndStatus(ctx context.Context, itemID
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+
+		}
+	}(rows)
 	var orders []*order.LimitOrder
 	for rows.Next() {
 		var o order.LimitOrder

@@ -23,7 +23,7 @@ func (r *MockOrderRepo) GetByIDForUpdate(ctx context.Context, id string) (*Limit
 	return r.GetByID(ctx, id)
 }
 
-func (r *MockOrderRepo) CancelOtherListed(ctx context.Context, itemID, exceptOrderID string) error {
+func (r *MockOrderRepo) CancelOtherListed(_ context.Context, itemID, exceptOrderID string) error {
 	for _, o := range r.orders {
 		if o.ItemID == itemID && o.ID != exceptOrderID && o.Status == Listed {
 			o.Status = Canceled
@@ -37,7 +37,7 @@ func (r *MockOrderRepo) RunInTransaction(ctx context.Context, fn func(ctx contex
 	return fn(ctx)
 }
 
-func (r *MockOrderRepo) GetOrdersByItemIDAndStatus(ctx context.Context, itemID string, status Status) ([]*LimitOrder, error) {
+func (r *MockOrderRepo) GetOrdersByItemIDAndStatus(_ context.Context, itemID string, status Status) ([]*LimitOrder, error) {
 
 	var orders []*LimitOrder
 	for _, order := range r.orders {
@@ -48,12 +48,12 @@ func (r *MockOrderRepo) GetOrdersByItemIDAndStatus(ctx context.Context, itemID s
 	return orders, nil
 }
 
-func (r *MockOrderRepo) Create(ctx context.Context, o *LimitOrder) error {
+func (r *MockOrderRepo) Create(_ context.Context, o *LimitOrder) error {
 	r.orders[o.ID] = o
 	return nil
 }
 
-func (r *MockOrderRepo) GetByID(ctx context.Context, id string) (*LimitOrder, error) {
+func (r *MockOrderRepo) GetByID(_ context.Context, id string) (*LimitOrder, error) {
 	o, ok := r.orders[id]
 	if !ok {
 		return nil, errors.New("order not found")
@@ -61,7 +61,7 @@ func (r *MockOrderRepo) GetByID(ctx context.Context, id string) (*LimitOrder, er
 	return o, nil
 }
 
-func (r *MockOrderRepo) Update(ctx context.Context, o *LimitOrder) error {
+func (r *MockOrderRepo) Update(_ context.Context, o *LimitOrder) error {
 	r.orders[o.ID] = o
 	return nil
 }
@@ -71,7 +71,7 @@ type MockWalletService struct {
 	guilds map[string]*guild.Guild
 }
 
-func (s *MockWalletService) Spend(ctx context.Context, id string, amount gold.Amount) error {
+func (s *MockWalletService) Spend(_ context.Context, id string, amount gold.Amount) error {
 	g, ok := s.guilds[id]
 	if !ok {
 		return fmt.Errorf("guild not found")
@@ -86,7 +86,7 @@ func (s *MockWalletService) Spend(ctx context.Context, id string, amount gold.Am
 	return nil
 }
 
-func (s *MockWalletService) Earn(ctx context.Context, id string, amount gold.Amount) error {
+func (s *MockWalletService) Earn(_ context.Context, id string, amount gold.Amount) error {
 	g, ok := s.guilds[id]
 	if !ok {
 		return fmt.Errorf("guild not found")
@@ -100,7 +100,7 @@ type MockItemService struct {
 	items map[string]*item.Item
 }
 
-func (s *MockItemService) TransferOwnership(ctx context.Context, itemID, sellerID, buyerID string) error {
+func (s *MockItemService) TransferOwnership(_ context.Context, itemID, _, buyerID string) error {
 	i, ok := s.items[itemID]
 	if !ok {
 		return fmt.Errorf("item %v not found", itemID)
@@ -112,7 +112,7 @@ func (s *MockItemService) TransferOwnership(ctx context.Context, itemID, sellerI
 	return nil
 }
 
-func (s *MockItemService) GetItem(ctx context.Context, itemID string) (*item.Item, error) {
+func (s *MockItemService) GetItem(_ context.Context, itemID string) (*item.Item, error) {
 	i, ok := s.items[itemID]
 	if !ok {
 		return nil, fmt.Errorf("item %v not found", itemID)
@@ -123,7 +123,7 @@ func (m *MockItemService) GetItemForUpdate(ctx context.Context, id string) (*ite
 	return m.GetItem(ctx, id)
 }
 
-func (s *MockItemService) UpdateItem(ctx context.Context, item *item.Item) error {
+func (s *MockItemService) UpdateItem(_ context.Context, item *item.Item) error {
 	s.items[item.ID] = item
 	return nil
 }

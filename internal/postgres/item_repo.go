@@ -51,7 +51,12 @@ func (r *ItemRepository) ListFree(ctx context.Context) ([]*item.Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+
+		}
+	}(rows)
 
 	var items []*item.Item
 	for rows.Next() {

@@ -20,7 +20,7 @@ func (f MockOwnerChecker) GuildExists(context.Context, string) (bool, error) {
 	return f.exists, f.err
 }
 
-func (r MockItemRepository) Create(ctx context.Context, it *Item) error {
+func (r MockItemRepository) Create(_ context.Context, it *Item) error {
 	r.items[it.ID] = it
 	return nil
 }
@@ -29,7 +29,7 @@ func (r MockItemRepository) GetItemForUpdate(ctx context.Context, id string) (*I
 	return r.GetByID(ctx, id)
 }
 
-func (r MockItemRepository) TransferFromOrder(ctx context.Context, itemID, sellerID, buyerID string) error {
+func (r MockItemRepository) TransferFromOrder(_ context.Context, itemID, sellerID, buyerID string) error {
 	if r.items[itemID].OwnerID != sellerID {
 		return fmt.Errorf("cannot sell item not owned")
 	}
@@ -41,7 +41,7 @@ func (r MockItemRepository) TransferFromOrder(ctx context.Context, itemID, selle
 	return nil
 }
 
-func (r MockItemRepository) GetByID(ctx context.Context, id string) (*Item, error) {
+func (r MockItemRepository) GetByID(_ context.Context, id string) (*Item, error) {
 	i, ok := r.items[id]
 	if !ok {
 		return nil, ErrItemNotFound
@@ -49,12 +49,12 @@ func (r MockItemRepository) GetByID(ctx context.Context, id string) (*Item, erro
 	return i, nil
 }
 
-func (r MockItemRepository) Update(ctx context.Context, i *Item) error {
+func (r MockItemRepository) Update(_ context.Context, i *Item) error {
 	r.items[i.ID] = i
 	return nil
 }
 
-func (r MockItemRepository) ListFree(ctx context.Context) ([]*Item, error) {
+func (r MockItemRepository) ListFree(_ context.Context) ([]*Item, error) {
 	var result []*Item
 	for _, it := range r.items {
 		if it.Status == Free {
@@ -64,7 +64,7 @@ func (r MockItemRepository) ListFree(ctx context.Context) ([]*Item, error) {
 	return result, nil
 }
 
-func (r MockItemRepository) MarkListedInAuction(ctx context.Context, id, sellerID string) error {
+func (r MockItemRepository) MarkListedInAuction(ctx context.Context, id, _ string) error {
 	item, err := r.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -82,7 +82,7 @@ func (r MockItemRepository) ReleaseFromAuction(ctx context.Context, id string) e
 	return nil
 }
 
-func (r MockItemRepository) TransferFromAuction(ctx context.Context, id, sellerID, winnerID string) error {
+func (r MockItemRepository) TransferFromAuction(ctx context.Context, id, _, winnerID string) error {
 	item, err := r.GetByID(ctx, id)
 	if err != nil {
 		return err
