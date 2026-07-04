@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"market-dragon/internal/item"
 )
 
@@ -82,4 +83,61 @@ func (r *ItemRepository) ListFree(ctx context.Context) ([]*item.Item, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+func (r *ItemRepository) MarkListedInAuction(ctx context.Context, id, sellerID string) error {
+	result, err := r.itemConn(ctx).ExecContext(ctx, `UPDATE items
+		SET status = 'listed_in_auction'
+		WHERE id = $1 AND owner_id = $2 AND type = 'legendary' AND status = 'free'`, id, sellerID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return fmt.Errorf("item cannot be listed in auction")
+	}
+	return nil
+}
+
+func (r *ItemRepository) ReleaseFromAuction(ctx context.Context, id string) error {
+	result, err := r.itemConn(ctx).ExecContext(ctx, `UPDATE items SET status = 'free'
+		WHERE id = $1 AND status = 'listed_in_auction'`, id)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return fmt.Errorf("item cannot be released from auction")
+	}
+	return nil
+}
+
+func (r *ItemRepository) TransferFromAuction(ctx context.Context, id, sellerID, winnerID string) error {
+	result, err := r.itemConn(ctx).ExecContext(ctx, `UPDATE items
+		SET owner_id = $3, status = 'free'
+		WHERE id = $1 AND owner_id = $2 AND status = 'listed_in_auction'`, id, sellerID, winnerID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return fmt.Errorf("item cannot be transferred from auction")
+	}
+	return nil
+}
+
+func (r *ItemRepository) itemConn(ctx context.Context) querier {
+	if tx := getTx(ctx); tx != nil {
+		return tx
+	}
+	return r.db
 }
