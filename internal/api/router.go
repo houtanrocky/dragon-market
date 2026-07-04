@@ -2,18 +2,13 @@ package api
 
 import (
 	"net/http"
-
-	"market-dragon/internal/auction"
-	"market-dragon/internal/guild"
-	"market-dragon/internal/item"
-	"market-dragon/internal/order"
 )
 
 func NewRouter(
-	guildSvc *guild.WalletServiceImpl,
-	itemSvc *item.ItemServiceImpl,
-	auctionSvc *auction.AuctionServiceImpl,
-	orderSvc *order.OrderService,
+	guildSvc GuildWalletService,
+	itemSvc ItemService,
+	auctionSvc AuctionService,
+	orderSvc OrderService,
 ) http.Handler {
 	mux := http.NewServeMux()
 

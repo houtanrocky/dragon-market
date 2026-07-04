@@ -1,13 +1,22 @@
 package api
 
 import (
+	"context"
+	"market-dragon/internal/gold"
 	"net/http"
 
 	"market-dragon/internal/auction"
 )
 
+type AuctionService interface {
+	StartAuction(ctx context.Context, itemID, sellerID string) (*auction.Auction, error)
+	PlaceBid(ctx context.Context, auctionID, bidderID string, amount gold.Amount) error
+	CancelBid(ctx context.Context, auctionID, bidID, bidderID string) error
+	EndAuction(ctx context.Context, auctionID string) error
+}
+
 type auctionHandler struct {
-	svc *auction.AuctionServiceImpl
+	svc AuctionService
 }
 
 // Start POST /auctions
