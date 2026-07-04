@@ -20,31 +20,31 @@ const (
 
 var fixedNow = time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
 
-type fakeClock struct{ now time.Time }
+type mockClock struct{ now time.Time }
 
-func (c fakeClock) Now() time.Time { return c.now }
+func (c mockClock) Now() time.Time { return c.now }
 
-type fakeTx struct{}
+type mockTx struct{}
 
-func (fakeTx) RunInTransaction(ctx context.Context, fn func(context.Context) error) error {
+func (mockTx) RunInTransaction(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
 }
 
-type fakeAuctionRepository struct {
+type mockAuctionRepository struct {
 	auctions map[string]*Auction
 	bids     map[string]*Bid
 }
 
-func newFakeAuctionRepository() *fakeAuctionRepository {
-	return &fakeAuctionRepository{auctions: map[string]*Auction{}, bids: map[string]*Bid{}}
+func newMockAuctionRepository() *mockAuctionRepository {
+	return &mockAuctionRepository{auctions: map[string]*Auction{}, bids: map[string]*Bid{}}
 }
 
-func (r *fakeAuctionRepository) CreateAuction(_ context.Context, a *Auction) error {
+func (r *mockAuctionRepository) CreateAuction(_ context.Context, a *Auction) error {
 	r.auctions[a.ID] = a
 	return nil
 }
 
-func (r *fakeAuctionRepository) GetAuctionByID(_ context.Context, id string) (*Auction, error) {
+func (r *mockAuctionRepository) GetAuctionByID(_ context.Context, id string) (*Auction, error) {
 	a := r.auctions[id]
 	if a == nil {
 		return nil, ErrAuctionNotFound
@@ -52,7 +52,7 @@ func (r *fakeAuctionRepository) GetAuctionByID(_ context.Context, id string) (*A
 	return a, nil
 }
 
-func (r *fakeAuctionRepository) GetActiveAuctionByItemID(_ context.Context, id string) (*Auction, error) {
+func (r *mockAuctionRepository) GetActiveAuctionByItemID(_ context.Context, id string) (*Auction, error) {
 	for _, a := range r.auctions {
 		if a.ItemID == id && a.Status == ActiveAuction {
 			return a, nil
@@ -61,7 +61,7 @@ func (r *fakeAuctionRepository) GetActiveAuctionByItemID(_ context.Context, id s
 	return nil, ErrAuctionNotFound
 }
 
-func (r *fakeAuctionRepository) ExtendActiveAuction(_ context.Context, id string, endsAt time.Time) error {
+func (r *mockAuctionRepository) ExtendActiveAuction(_ context.Context, id string, endsAt time.Time) error {
 	a, err := r.GetAuctionByID(context.Background(), id)
 	if err != nil || a.Status != ActiveAuction {
 		return ErrAuctionNotActive
@@ -70,7 +70,7 @@ func (r *fakeAuctionRepository) ExtendActiveAuction(_ context.Context, id string
 	return nil
 }
 
-func (r *fakeAuctionRepository) EndActiveAuction(_ context.Context, id string) error {
+func (r *mockAuctionRepository) EndActiveAuction(_ context.Context, id string) error {
 	a, err := r.GetAuctionByID(context.Background(), id)
 	if err != nil || a.Status != ActiveAuction {
 		return ErrAuctionNotActive
@@ -79,12 +79,12 @@ func (r *fakeAuctionRepository) EndActiveAuction(_ context.Context, id string) e
 	return nil
 }
 
-func (r *fakeAuctionRepository) CreateBid(_ context.Context, b *Bid) error {
+func (r *mockAuctionRepository) CreateBid(_ context.Context, b *Bid) error {
 	r.bids[b.ID] = b
 	return nil
 }
 
-func (r *fakeAuctionRepository) GetBidByID(_ context.Context, id string) (*Bid, error) {
+func (r *mockAuctionRepository) GetBidByID(_ context.Context, id string) (*Bid, error) {
 	b := r.bids[id]
 	if b == nil {
 		return nil, ErrBidNotFound
@@ -92,7 +92,7 @@ func (r *fakeAuctionRepository) GetBidByID(_ context.Context, id string) (*Bid, 
 	return b, nil
 }
 
-func (r *fakeAuctionRepository) GetTopActiveBid(_ context.Context, auctionID string) (*Bid, error) {
+func (r *mockAuctionRepository) GetTopActiveBid(_ context.Context, auctionID string) (*Bid, error) {
 	for _, b := range r.bids {
 		if b.AuctionID == auctionID && b.Status == ActiveBid {
 			return b, nil
@@ -101,7 +101,7 @@ func (r *fakeAuctionRepository) GetTopActiveBid(_ context.Context, auctionID str
 	return nil, ErrBidNotFound
 }
 
-func (r *fakeAuctionRepository) MarkBidOutbid(_ context.Context, id string) error {
+func (r *mockAuctionRepository) MarkBidOutbid(_ context.Context, id string) error {
 	b, err := r.GetBidByID(context.Background(), id)
 	if err != nil || b.Status != ActiveBid {
 		return ErrBidNotFound
@@ -110,7 +110,7 @@ func (r *fakeAuctionRepository) MarkBidOutbid(_ context.Context, id string) erro
 	return nil
 }
 
-func (r *fakeAuctionRepository) CancelOutbidBid(_ context.Context, auctionID, bidID, bidderID string) error {
+func (r *mockAuctionRepository) CancelOutbidBid(_ context.Context, auctionID, bidID, bidderID string) error {
 	b, err := r.GetBidByID(context.Background(), bidID)
 	if err != nil || b.AuctionID != auctionID || b.BidderID != bidderID || b.Status != OutbidBid {
 		return ErrBidNotCancellable
@@ -119,7 +119,7 @@ func (r *fakeAuctionRepository) CancelOutbidBid(_ context.Context, auctionID, bi
 	return nil
 }
 
-func (r *fakeAuctionRepository) MarkBidWinning(_ context.Context, id string) error {
+func (r *mockAuctionRepository) MarkBidWinning(_ context.Context, id string) error {
 	b, err := r.GetBidByID(context.Background(), id)
 	if err != nil || b.Status != ActiveBid {
 		return ErrBidNotFound
@@ -133,39 +133,39 @@ type walletCall struct {
 	amount  gold.Amount
 }
 
-type fakeWallet struct {
+type mockWallet struct {
 	reserved []walletCall
 	released []walletCall
 	deducted []walletCall
 	earned   []walletCall
 }
 
-func (w *fakeWallet) Reserve(_ context.Context, id string, amount gold.Amount) error {
+func (w *mockWallet) Reserve(_ context.Context, id string, amount gold.Amount) error {
 	w.reserved = append(w.reserved, walletCall{id, amount})
 	return nil
 }
-func (w *fakeWallet) Release(_ context.Context, id string, amount gold.Amount) error {
+func (w *mockWallet) Release(_ context.Context, id string, amount gold.Amount) error {
 	w.released = append(w.released, walletCall{id, amount})
 	return nil
 }
-func (w *fakeWallet) Deduct(_ context.Context, id string, amount gold.Amount) error {
+func (w *mockWallet) Deduct(_ context.Context, id string, amount gold.Amount) error {
 	w.deducted = append(w.deducted, walletCall{id, amount})
 	return nil
 }
-func (w *fakeWallet) Earn(_ context.Context, id string, amount gold.Amount) error {
+func (w *mockWallet) Earn(_ context.Context, id string, amount gold.Amount) error {
 	w.earned = append(w.earned, walletCall{id, amount})
 	return nil
 }
 
-type fakeItems struct{ items map[string]*item.Item }
+type mockItems struct{ items map[string]*item.Item }
 
-func newFakeItems() *fakeItems {
-	return &fakeItems{items: map[string]*item.Item{itemID: {
+func newMockItems() *mockItems {
+	return &mockItems{items: map[string]*item.Item{itemID: {
 		ID: itemID, Type: item.Legendary, OwnerID: sellerID, Status: item.Free,
 	}}}
 }
 
-func (s *fakeItems) Get(_ context.Context, id string) (*item.Item, error) {
+func (s *mockItems) Get(_ context.Context, id string) (*item.Item, error) {
 	it := s.items[id]
 	if it == nil {
 		return nil, item.ErrItemNotFound
@@ -173,7 +173,7 @@ func (s *fakeItems) Get(_ context.Context, id string) (*item.Item, error) {
 	return it, nil
 }
 
-func (s *fakeItems) MarkListedInAuction(_ context.Context, id, owner string) error {
+func (s *mockItems) MarkListedInAuction(_ context.Context, id, owner string) error {
 	it := s.items[id]
 	if it == nil || it.OwnerID != owner || it.Status != item.Free || it.Type != item.Legendary {
 		return ErrItemNotAvailable
@@ -182,7 +182,7 @@ func (s *fakeItems) MarkListedInAuction(_ context.Context, id, owner string) err
 	return nil
 }
 
-func (s *fakeItems) TransferFromAuction(_ context.Context, id, owner, winner string) error {
+func (s *mockItems) TransferFromAuction(_ context.Context, id, owner, winner string) error {
 	it := s.items[id]
 	if it == nil || it.OwnerID != owner || it.Status != item.ListedInAuction {
 		return ErrItemNotAvailable
@@ -191,7 +191,7 @@ func (s *fakeItems) TransferFromAuction(_ context.Context, id, owner, winner str
 	return nil
 }
 
-func (s *fakeItems) ReleaseFromAuction(_ context.Context, id string) error {
+func (s *mockItems) ReleaseFromAuction(_ context.Context, id string) error {
 	it := s.items[id]
 	if it == nil || it.Status != item.ListedInAuction {
 		return ErrItemNotAvailable
@@ -200,8 +200,8 @@ func (s *fakeItems) ReleaseFromAuction(_ context.Context, id string) error {
 	return nil
 }
 
-func newService(repo *fakeAuctionRepository, wallet *fakeWallet, items *fakeItems, now time.Time) *AuctionServiceImpl {
-	return NewAuctionService(repo, wallet, items, fakeTx{}, WithClock(fakeClock{now: now}))
+func newService(repo *mockAuctionRepository, wallet *mockWallet, items *mockItems, now time.Time) *AuctionServiceImpl {
+	return NewAuctionService(repo, wallet, items, mockTx{}, WithClock(mockClock{now: now}))
 }
 
 func activeAuction(endsAt time.Time) *Auction {
@@ -209,7 +209,7 @@ func activeAuction(endsAt time.Time) *Auction {
 }
 
 func TestService_StartAuction(t *testing.T) {
-	repo, wallet, items := newFakeAuctionRepository(), &fakeWallet{}, newFakeItems()
+	repo, wallet, items := newMockAuctionRepository(), &mockWallet{}, newMockItems()
 	svc := newService(repo, wallet, items, fixedNow)
 
 	a, err := svc.StartAuction(context.Background(), itemID, sellerID)
@@ -222,7 +222,7 @@ func TestService_StartAuction(t *testing.T) {
 }
 
 func TestService_PlaceBid_ReplacesTopAndExtendsDeadline(t *testing.T) {
-	repo, wallet, items := newFakeAuctionRepository(), &fakeWallet{}, newFakeItems()
+	repo, wallet, items := newMockAuctionRepository(), &mockWallet{}, newMockItems()
 	repo.auctions[auctionID] = activeAuction(fixedNow.Add(4 * time.Minute))
 	repo.bids["old"] = &Bid{ID: "old", AuctionID: auctionID, BidderID: bidder1, Amount: 100, Status: ActiveBid}
 	svc := newService(repo, wallet, items, fixedNow)
@@ -239,7 +239,7 @@ func TestService_PlaceBid_ReplacesTopAndExtendsDeadline(t *testing.T) {
 }
 
 func TestService_PlaceBid_RejectsLowIncrement(t *testing.T) {
-	repo, wallet, items := newFakeAuctionRepository(), &fakeWallet{}, newFakeItems()
+	repo, wallet, items := newMockAuctionRepository(), &mockWallet{}, newMockItems()
 	repo.auctions[auctionID] = activeAuction(fixedNow.Add(time.Hour))
 	repo.bids["old"] = &Bid{ID: "old", AuctionID: auctionID, BidderID: bidder1, Amount: 100, Status: ActiveBid}
 	svc := newService(repo, wallet, items, fixedNow)
@@ -251,7 +251,7 @@ func TestService_PlaceBid_RejectsLowIncrement(t *testing.T) {
 }
 
 func TestService_CancelBid_CancelsOutbidWithoutReleasingAgain(t *testing.T) {
-	repo, wallet, items := newFakeAuctionRepository(), &fakeWallet{}, newFakeItems()
+	repo, wallet, items := newMockAuctionRepository(), &mockWallet{}, newMockItems()
 	repo.auctions[auctionID] = activeAuction(fixedNow.Add(time.Hour))
 	repo.bids["old"] = &Bid{ID: "old", AuctionID: auctionID, BidderID: bidder1, Amount: 100, Status: OutbidBid}
 	svc := newService(repo, wallet, items, fixedNow)
@@ -265,7 +265,7 @@ func TestService_CancelBid_CancelsOutbidWithoutReleasingAgain(t *testing.T) {
 }
 
 func TestService_EndAuction_SettlesWinner(t *testing.T) {
-	repo, wallet, items := newFakeAuctionRepository(), &fakeWallet{}, newFakeItems()
+	repo, wallet, items := newMockAuctionRepository(), &mockWallet{}, newMockItems()
 	items.items[itemID].Status = item.ListedInAuction
 	repo.auctions[auctionID] = activeAuction(fixedNow.Add(-time.Second))
 	repo.bids["top"] = &Bid{ID: "top", AuctionID: auctionID, BidderID: bidder1, Amount: 200, Status: ActiveBid}
@@ -283,7 +283,7 @@ func TestService_EndAuction_SettlesWinner(t *testing.T) {
 }
 
 func TestService_EndAuction_WithoutBidsReleasesItem(t *testing.T) {
-	repo, wallet, items := newFakeAuctionRepository(), &fakeWallet{}, newFakeItems()
+	repo, wallet, items := newMockAuctionRepository(), &mockWallet{}, newMockItems()
 	items.items[itemID].Status = item.ListedInAuction
 	repo.auctions[auctionID] = activeAuction(fixedNow.Add(-time.Second))
 	svc := newService(repo, wallet, items, fixedNow)
