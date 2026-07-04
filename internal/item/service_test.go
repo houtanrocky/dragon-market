@@ -32,6 +32,33 @@ func (r MockItemRepository) ListFree(ctx context.Context) ([]*Item, error) {
 	return result, nil
 }
 
+func (r MockItemRepository) MarkListedInAuction(ctx context.Context, id, sellerID string) error {
+	item, err := r.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	item.Status = ListedInAuction
+	return nil
+}
+
+func (r MockItemRepository) ReleaseFromAuction(ctx context.Context, id string) error {
+	item, err := r.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	item.Status = Free
+	return nil
+}
+
+func (r MockItemRepository) TransferFromAuction(ctx context.Context, id, sellerID, winnerID string) error {
+	item, err := r.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	item.OwnerID, item.Status = winnerID, Free
+	return nil
+}
+
 // ---------------------------- Tests ----------
 func TestService_Get_Success(t *testing.T) {
 	const (

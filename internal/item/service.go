@@ -2,6 +2,7 @@ package item
 
 import (
 	"context"
+	"fmt"
 )
 
 type ItemService interface {
@@ -36,4 +37,19 @@ func (s *ItemServiceImpl) ListFree(ctx context.Context) ([]*Item, error) {
 	}
 
 	return av, nil
+}
+
+func (s *ItemServiceImpl) ReleaseFromAuction(ctx context.Context, id string) error {
+	return s.itemRepository.ReleaseFromAuction(ctx, id)
+}
+
+func (s *ItemServiceImpl) MarkListedInAuction(ctx context.Context, id, sellerID string) error {
+	return s.itemRepository.MarkListedInAuction(ctx, id, sellerID)
+}
+
+func (s *ItemServiceImpl) TransferFromAuction(ctx context.Context, itemID, sellerID, winnerID string) error {
+	if winnerID == "" {
+		return fmt.Errorf("winner ID is required")
+	}
+	return s.itemRepository.TransferFromAuction(ctx, itemID, sellerID, winnerID)
 }
