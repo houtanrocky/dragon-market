@@ -58,10 +58,10 @@ func (s *OrderServiceImpl) List(ctx context.Context, itemID, sellerID string, pr
 			return err
 		}
 		if it.OwnerID != sellerID {
-			return fmt.Errorf("item %s is not owned by seller %s", itemID, sellerID)
+			return ErrOrderItemNotOwnedBySeller
 		}
 		if it.Status == item.ListedInAuction {
-			return fmt.Errorf("item %s is listed in auction", itemID)
+			return ErrCantListOrderListedInAuction
 		}
 
 		if it.Status == item.Free {
@@ -107,8 +107,11 @@ func (s *OrderServiceImpl) Buy(ctx context.Context, orderID, buyerID string) err
 		if o.ItemID != it.ID {
 			return fmt.Errorf("order item changed unexpectedly")
 		}
+		if o.Status == Sold {
+			return ErrOrderAlreadySold
+		}
 		if o.Status != Listed {
-			return fmt.Errorf("cannot buy order with status %q", o.Status)
+			return ErrOrderNotListed
 		}
 		if o.SellerID == buyerID {
 			return fmt.Errorf("cannot buy your own listing")
@@ -159,10 +162,10 @@ func (s *OrderServiceImpl) Cancel(ctx context.Context, orderID, sellerID string)
 		}
 
 		if o.SellerID != sellerID {
-			return fmt.Errorf("cannot cancel an order listed by another seller")
+			return ErrCancelOrderListedByAnother
 		}
 		if o.Status != Listed {
-			return fmt.Errorf("cannot cancel order with status %q", o.Status)
+			return ErrCancelOrderNotListed
 		}
 
 		o.Status = Canceled
