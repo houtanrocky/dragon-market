@@ -14,7 +14,7 @@ type AuctionRepository interface {
 	ExtendActiveAuction(ctx context.Context, auctionID string, endsAt time.Time) error
 	EndActiveAuction(ctx context.Context, auctionID string) error
 
-	CreateBid(ctx context.Context, bid *Bid) error
+	CreateBid(ctx context.Context, bid *Bid) (*Bid, error)
 	GetBidByID(ctx context.Context, bidID string) (*Bid, error)
 	GetTopActiveBid(ctx context.Context, auctionID string) (*Bid, error)
 	MarkBidOutbid(ctx context.Context, bidID string) error

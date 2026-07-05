@@ -79,9 +79,9 @@ func (r *mockAuctionRepository) EndActiveAuction(_ context.Context, id string) e
 	return nil
 }
 
-func (r *mockAuctionRepository) CreateBid(_ context.Context, b *Bid) error {
+func (r *mockAuctionRepository) CreateBid(_ context.Context, b *Bid) (*Bid, error) {
 	r.bids[b.ID] = b
-	return nil
+	return b, nil
 }
 
 func (r *mockAuctionRepository) GetBidByID(_ context.Context, id string) (*Bid, error) {
@@ -227,7 +227,7 @@ func TestService_PlaceBid_ReplacesTopAndExtendsDeadline(t *testing.T) {
 	repo.bids["old"] = &Bid{ID: "old", AuctionID: auctionID, BidderID: bidder1, Amount: 100, Status: ActiveBid}
 	svc := newService(repo, wallet, items, fixedNow)
 
-	if err := svc.PlaceBid(context.Background(), auctionID, bidder2, 105); err != nil {
+	if _, err := svc.PlaceBid(context.Background(), auctionID, bidder2, 105); err != nil {
 		t.Fatalf("PlaceBid() error = %v", err)
 	}
 	if repo.bids["old"].Status != OutbidBid || len(wallet.released) != 1 || len(wallet.reserved) != 1 {
@@ -244,7 +244,7 @@ func TestService_PlaceBid_RejectsLowIncrement(t *testing.T) {
 	repo.bids["old"] = &Bid{ID: "old", AuctionID: auctionID, BidderID: bidder1, Amount: 100, Status: ActiveBid}
 	svc := newService(repo, wallet, items, fixedNow)
 
-	err := svc.PlaceBid(context.Background(), auctionID, bidder2, 104)
+	_, err := svc.PlaceBid(context.Background(), auctionID, bidder2, 104)
 	if !errors.Is(err, ErrBidTooLow) {
 		t.Fatalf("PlaceBid() error = %v, want ErrBidTooLow", err)
 	}

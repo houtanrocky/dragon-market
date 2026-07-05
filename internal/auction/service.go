@@ -119,16 +119,21 @@ func (s *AuctionServiceImpl) StartAuction(ctx context.Context, itemID, sellerID 
 	return created, nil
 }
 
-func (s *AuctionServiceImpl) PlaceBid(ctx context.Context, auctionID, bidderID string, amount gold.Amount) error {
+func (s *AuctionServiceImpl) PlaceBid(ctx context.Context, auctionID, bidderID string, amount gold.Amount) (*Bid, error) {
 	if amount <= 0 {
-		return ErrInvalidBidAmount
+		return nil, ErrInvalidBidAmount
 	}
-	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
+
+	var bid *Bid
+
+	err := s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		auction, err := s.repo.GetAuctionByID(ctx, auctionID)
 		if err != nil {
 			return err
 		}
+
 		now := s.clock.Now()
+
 		if auction.Status != ActiveAuction {
 			return ErrAuctionNotActive
 		}
@@ -139,46 +144,67 @@ func (s *AuctionServiceImpl) PlaceBid(ctx context.Context, auctionID, bidderID s
 			return ErrSellerCannotBid
 		}
 
-		top, err := s.repo.GetTopActiveBid(ctx, auctionID)
+		topBid, err := s.repo.GetTopActiveBid(ctx, auctionID)
 		if err != nil && !errors.Is(err, ErrBidNotFound) {
 			return err
 		}
-		if top != nil && amount < minimumNextBid(top.Amount) {
-			return fmt.Errorf("minimum bid is %d: %w", minimumNextBid(top.Amount), ErrBidTooLow)
+
+		if topBid != nil && amount < minimumNextBid(topBid.Amount) {
+			return fmt.Errorf("minimum bid is %d: %w", minimumNextBid(topBid.Amount), ErrBidTooLow)
 		}
 
-		if top != nil && top.BidderID == bidderID {
-			if err := s.walletService.Reserve(ctx, bidderID, amount-top.Amount); err != nil {
+		if topBid != nil && topBid.BidderID == bidderID {
+			if err := s.walletService.Reserve(ctx, bidderID, amount-topBid.Amount); err != nil {
 				return err
 			}
 		} else {
 			if err := s.walletService.Reserve(ctx, bidderID, amount); err != nil {
 				return err
 			}
-			if top != nil {
-				if err := s.walletService.Release(ctx, top.BidderID, top.Amount); err != nil {
+			if topBid != nil {
+				if err := s.walletService.Release(ctx, topBid.BidderID, topBid.Amount); err != nil {
 					return err
 				}
 			}
 		}
-		if top != nil {
-			if err := s.repo.MarkBidOutbid(ctx, top.ID); err != nil {
+
+		if topBid != nil {
+			if err := s.repo.MarkBidOutbid(ctx, topBid.ID); err != nil {
 				return err
 			}
 		}
-		if err := s.repo.CreateBid(ctx, &Bid{
-			ID: uuid.NewString(), AuctionID: auctionID, BidderID: bidderID,
-			Amount: amount, PlacedAt: now, Status: ActiveBid,
-		}); err != nil {
-			return err
+
+		// Create new bid
+		newBid := &Bid{
+			ID:        uuid.NewString(),
+			AuctionID: auctionID,
+			BidderID:  bidderID,
+			Amount:    amount,
+			PlacedAt:  now,
+			Status:    ActiveBid,
 		}
 
+		var err2 error
+		bid, err2 = s.repo.CreateBid(ctx, newBid)
+		if err2 != nil {
+			return err2
+		}
+
+		// Extend auction if bid placed near the end
 		remaining := auction.EndsAt.Sub(now)
 		if remaining > 0 && remaining <= s.config.ExtensionWindow {
-			return s.repo.ExtendActiveAuction(ctx, auctionID, auction.EndsAt.Add(s.config.Extension))
+			if err := s.repo.ExtendActiveAuction(ctx, auctionID, auction.EndsAt.Add(s.config.Extension)); err != nil {
+				return err
+			}
 		}
+
 		return nil
 	})
+
+	if err != nil {
+		return nil, err
+	}
+	return bid, nil
 }
 
 func (s *AuctionServiceImpl) CancelBid(ctx context.Context, auctionID, bidID, bidderID string) error {
@@ -238,6 +264,14 @@ func (s *AuctionServiceImpl) EndAuction(ctx context.Context, auctionID string) e
 		}
 		return s.repo.EndActiveAuction(ctx, auctionID)
 	})
+}
+
+func (s *AuctionServiceImpl) GetBid(ctx context.Context, bidID string) (*Bid, error) {
+	b, err := s.GetBid(ctx, bidID)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
 func minimumNextBid(current gold.Amount) gold.Amount {
