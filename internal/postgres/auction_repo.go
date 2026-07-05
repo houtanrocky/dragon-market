@@ -65,11 +65,19 @@ func (r *AuctionRepository) EndActiveAuction(ctx context.Context, id string) err
 		`UPDATE auctions SET status = 'ended' WHERE id = $1 AND status = 'active'`, id))
 }
 
-func (r *AuctionRepository) CreateBid(ctx context.Context, b *auction.Bid) error {
-	_, err := r.conn(ctx).ExecContext(ctx, `INSERT INTO bids
-		(id, auction_id, bidder_id, amount, placed_at, status) VALUES ($1, $2, $3, $4, $5, $6)`,
+func (r *AuctionRepository) CreateBid(ctx context.Context, b *auction.Bid) (*auction.Bid, error) {
+	rows := r.conn(ctx).QueryRowContext(ctx, `INSERT INTO bids
+		(id, auction_id, bidder_id, amount, placed_at, status) VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, auction_id, bidder_id, amount, placed_at, status`,
 		b.ID, b.AuctionID, b.BidderID, b.Amount, b.PlacedAt, b.Status)
-	return err
+
+	var created auction.Bid
+	err := rows.Scan(&created.ID, &created.AuctionID, &created.BidderID, &created.Amount, &created.PlacedAt, &created.Status)
+	if err != nil {
+		return nil, err
+	}
+
+	return &created, err
 }
 
 func (r *AuctionRepository) GetBidByID(ctx context.Context, id string) (*auction.Bid, error) {

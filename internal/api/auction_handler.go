@@ -217,36 +217,60 @@ func (h *auctionHandler) GetBid(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// CancelBid DELETE /auctions/{auctionID}/bids/{bidID}
+// CancelBid handles DELETE /auctions/{auctionID}/bids/{bidID}.
 func (h *auctionHandler) CancelBid(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	if id == "" {
+	auctionID := chi.URLParam(r, "auctionID")
+	if auctionID == "" {
+		http.Error(w, "auction ID is required", http.StatusBadRequest)
+		return
+	}
+
+	bidID := chi.URLParam(r, "bidID")
+	if bidID == "" {
 		http.Error(w, "bid ID is required", http.StatusBadRequest)
 		return
 	}
 
-	b, err := h.svc.GetBid(r.Context(), id)
-	if errors.Is(err, auction.ErrBidNotFound) {
+	bid, err := h.svc.GetBid(r.Context(), bidID)
+	switch {
+	case errors.Is(err, auction.ErrBidNotFound):
 		http.Error(w, "bid not found", http.StatusNotFound)
 		return
-	}
-	if err != nil {
-		slog.Error("get bid", "bid_id", id, "error", err)
+	case err != nil:
+		slog.Error("get bid", "bid_id", bidID, "error", err)
 		http.Error(w, "failed to get bid", http.StatusInternalServerError)
 		return
-	}
-	if b == nil {
-		slog.Error("get bid returned nil", "bid_id", id)
+	case bid == nil:
+		slog.Error("get bid returned nil", "bid_id", bidID)
 		http.Error(w, "failed to get bid", http.StatusInternalServerError)
+		return
+	case bid.AuctionID != auctionID:
+		http.Error(w, "bid not found for this auction", http.StatusNotFound)
 		return
 	}
 
-	err = h.svc.CancelBid(r.Context(), b.AuctionID, b.ID, b.BidderID)
-	if err != nil {
-		slog.Error("cancel bid", "bid_id", id, "error", err)
+	err = h.svc.CancelBid(r.Context(), auctionID, bidID, bid.BidderID)
+	switch {
+	case errors.Is(err, auction.ErrBidNotFound):
+		http.Error(w, "bid not found", http.StatusNotFound)
+		return
+	case errors.Is(err, auction.ErrAuctionNotFound):
+		http.Error(w, "auction not found", http.StatusNotFound)
+		return
+	case errors.Is(err, auction.ErrBidNotCancellable),
+		errors.Is(err, auction.ErrAuctionNotActive):
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	case err != nil:
+		slog.Error(
+			"cancel bid",
+			"auction_id", auctionID,
+			"bid_id", bidID,
+			"error", err,
+		)
 		http.Error(w, "failed to cancel bid", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNoContent)
 }

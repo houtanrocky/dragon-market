@@ -40,7 +40,7 @@ func TestAuctionRepository_Lifecycle(t *testing.T) {
 		ID: "bid-1", AuctionID: a.ID, BidderID: "bidder",
 		Amount: 105, PlacedAt: time.Now(), Status: auction.ActiveBid,
 	}
-	if err := repo.CreateBid(ctx, b); err != nil {
+	if _, err := repo.CreateBid(ctx, b); err != nil {
 		t.Fatal(err)
 	}
 	if err := repo.MarkBidOutbid(ctx, b.ID); err != nil {

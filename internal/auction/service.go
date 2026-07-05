@@ -267,7 +267,7 @@ func (s *AuctionServiceImpl) EndAuction(ctx context.Context, auctionID string) e
 }
 
 func (s *AuctionServiceImpl) GetBid(ctx context.Context, bidID string) (*Bid, error) {
-	b, err := s.GetBid(ctx, bidID)
+	b, err := s.repo.GetBidByID(ctx, bidID)
 	if err != nil {
 		return nil, err
 	}
