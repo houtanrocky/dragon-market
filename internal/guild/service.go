@@ -151,3 +151,12 @@ func (s *WalletServiceImpl) Spend(ctx context.Context, id string, amount gold.Am
 		return repo.Update(ctx, g)
 	})
 }
+
+func (s *WalletServiceImpl) GetGuild(ctx context.Context, id string) (*Guild, error) {
+	g, err := s.guildRepository.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return g, nil
+}
