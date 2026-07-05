@@ -29,12 +29,6 @@ type ItemService interface {
 	UpdateItem(ctx context.Context, item *item.Item) error
 }
 
-type OrderService interface {
-	List(ctx context.Context, itemID, sellerID string, price gold.Amount) (*LimitOrder, error)
-	Buy(ctx context.Context, orderID, buyerID string) error
-	Cancel(ctx context.Context, orderID, sellerID string) error
-}
-
 // OrderServiceImpl handles listing and purchasing of Common/Rare items.
 type OrderServiceImpl struct {
 	repo      OrderRepository
