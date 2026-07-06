@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"market-dragon/internal/gold"
 	"market-dragon/internal/guild"
+	"mime"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -33,7 +35,48 @@ func newGuildResponse(g *guild.Guild) guildResponse {
 }
 
 type GuildWalletService interface {
+	CreateGuild(ctx context.Context, id string, initialGold, dailyLimit gold.Amount) (*guild.Guild, error)
 	GetGuild(ctx context.Context, id string) (*guild.Guild, error)
+}
+
+type createGuildRequest struct {
+	ID         string      `json:"id"`
+	Gold       gold.Amount `json:"gold"`
+	DailyLimit gold.Amount `json:"daily_limit"`
+}
+
+func (h *guildHandler) Create(w http.ResponseWriter, r *http.Request) {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
+		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var req createGuildRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		http.Error(w, "request body must contain one JSON object", http.StatusBadRequest)
+		return
+	}
+	g, err := h.svc.CreateGuild(r.Context(), req.ID, req.Gold, req.DailyLimit)
+	if writeDomainError(w, err) {
+		return
+	}
+	if err != nil {
+		slog.Error("create guild", "error", err)
+		http.Error(w, "failed to create guild", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(newGuildResponse(g)); err != nil {
+		slog.Error("encode guild response", "error", err)
+	}
 }
 
 type guildHandler struct {

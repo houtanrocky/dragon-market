@@ -22,6 +22,7 @@ func writeDomainError(w http.ResponseWriter, err error) bool {
 		errors.Is(err, order.ErrOwnerNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, item.ErrInvalidItem),
+		errors.Is(err, guild.ErrInvalidGuild),
 		errors.Is(err, order.ErrInvalidOrder),
 		errors.Is(err, auction.ErrInvalidBidAmount),
 		errors.Is(err, auction.ErrItemNotLegendary),
@@ -34,6 +35,7 @@ func writeDomainError(w http.ResponseWriter, err error) bool {
 		errors.Is(err, order.ErrCancelOrderListedByAnother):
 		http.Error(w, err.Error(), http.StatusForbidden)
 	case errors.Is(err, auction.ErrItemNotAvailable),
+		errors.Is(err, guild.ErrGuildAlreadyExists),
 		errors.Is(err, auction.ErrActiveAuctionExists),
 		errors.Is(err, auction.ErrAuctionNotActive),
 		errors.Is(err, auction.ErrAuctionFinished),

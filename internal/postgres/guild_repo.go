@@ -23,6 +23,25 @@ func NewWalletRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
+func (r *Repository) Create(ctx context.Context, g *guild.Guild) error {
+	result, err := r.guildConn(ctx).ExecContext(ctx, `INSERT INTO guilds
+		(id, gold, reserved, daily_limit, daily_spent, daily_spent_on)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (id) DO NOTHING`,
+		g.ID, g.Gold, g.Reserved, g.DailyLimit, g.DailySpent, g.SpentOn)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return guild.ErrGuildAlreadyExists
+	}
+	return nil
+}
+
 func (r *Repository) GuildExists(ctx context.Context, guildID string) (bool, error) {
 	var exists bool
 	err := r.guildConn(ctx).QueryRowContext(ctx, `

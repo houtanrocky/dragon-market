@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "d57de59e-c74e-4c64-b16c-cb305cd101c3",
     "name": "Dragon Market API",
-    "description": "Complete API collection for the Aethoria Dragon Market challenge. Before running requests, seed guild-seller, guild-buyer, and guild-bidder in PostgreSQL because the application has no guild-creation endpoint.",
+    "description": "Complete API collection for the Aethoria Dragon Market challenge. Run the three Create Guild requests before creating items, orders, and auctions.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -34,6 +34,34 @@
     {
       "name": "Guild Wallets",
       "item": [
+        {
+          "name": "Create Seller Guild",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": \"{{seller_id}}\",\n  \"gold\": 10000,\n  \"daily_limit\": 5000\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/guilds", "host": ["{{base_url}}"], "path": ["guilds"] },
+            "description": "Returns 201 when created or 409 if the ID already exists."
+          }
+        },
+        {
+          "name": "Create Buyer Guild",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": \"{{buyer_id}}\",\n  \"gold\": 10000,\n  \"daily_limit\": 5000\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/guilds", "host": ["{{base_url}}"], "path": ["guilds"] }
+          }
+        },
+        {
+          "name": "Create Bidder Guild",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": \"{{bidder_id}}\",\n  \"gold\": 10000,\n  \"daily_limit\": 5000\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/guilds", "host": ["{{base_url}}"], "path": ["guilds"] }
+          }
+        },
         {
           "name": "Get Seller Wallet",
           "request": {

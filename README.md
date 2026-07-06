@@ -43,6 +43,7 @@ Prices are refreshed immediately at startup and every 30 seconds. Zero, negative
 ## Core API
 
 - `POST /items`
+- `POST /guilds`
 - `GET /items` and `GET /items/{id}`
 - `POST /orders`
 - `POST /orders/{id}/buy` — requires `Idempotency-Key`
@@ -63,7 +64,7 @@ curl -X POST http://localhost:8080/orders/order-1/buy \
   -d '{"buyer_id":"guild-2"}'
 ```
 
-Guild IDs are treated as trusted caller input because authentication is outside this challenge's scope.
+Guild IDs are treated as trusted caller input because authentication is outside this challenge's scope. For manual testing, create one with `POST /guilds` using `{"id":"guild-1","gold":10000,"daily_limit":5000}`.
 
 ## Reliability and business rules
 

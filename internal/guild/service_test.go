@@ -2,6 +2,8 @@ package guild
 
 import (
 	"context"
+	"errors"
+	"market-dragon/internal/gold"
 	"testing"
 	"time"
 )
@@ -43,6 +45,41 @@ func (m *MockGuildRepo) Update(ctx context.Context, g *Guild) error {
 	m.guilds[g.ID] = g
 
 	return nil
+}
+
+func (m *MockGuildRepo) Create(_ context.Context, g *Guild) error {
+	if _, exists := m.guilds[g.ID]; exists {
+		return ErrGuildAlreadyExists
+	}
+	m.guilds[g.ID] = g
+	return nil
+}
+
+func TestWalletService_CreateGuild(t *testing.T) {
+	repo := &MockGuildRepo{guilds: make(map[string]*Guild)}
+	svc := NewWalletService(repo, &MockTransactor{})
+	g, err := svc.CreateGuild(context.Background(), " guild-1 ", 1000, 500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.ID != "guild-1" || g.Gold != 1000 || g.DailyLimit != 500 || g.SpentOn.IsZero() {
+		t.Fatalf("unexpected guild: %+v", g)
+	}
+	if _, err := svc.CreateGuild(context.Background(), "guild-1", 1000, 500); !errors.Is(err, ErrGuildAlreadyExists) {
+		t.Fatalf("duplicate error=%v", err)
+	}
+}
+
+func TestWalletService_CreateGuild_RejectsInvalidValues(t *testing.T) {
+	svc := NewWalletService(&MockGuildRepo{guilds: make(map[string]*Guild)}, &MockTransactor{})
+	for _, input := range []struct {
+		id          string
+		gold, limit gold.Amount
+	}{{"", 1, 1}, {"guild", -1, 1}, {"guild", 1, -1}} {
+		if _, err := svc.CreateGuild(context.Background(), input.id, input.gold, input.limit); !errors.Is(err, ErrInvalidGuild) {
+			t.Fatalf("CreateGuild(%q,%d,%d) error=%v", input.id, input.gold, input.limit, err)
+		}
+	}
 }
 
 type MockTransactor struct{}

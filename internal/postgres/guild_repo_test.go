@@ -2,7 +2,10 @@ package postgres
 
 import (
 	"context"
+	"errors"
+	"market-dragon/internal/guild"
 	"testing"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -91,5 +94,27 @@ func TestGuildRepository_GuildExists(t *testing.T) {
 	}
 	if exists {
 		t.Fatal("expected missing guild not to exist")
+	}
+}
+
+func TestGuildRepository_Create(t *testing.T) {
+	ctx := context.Background()
+	if err := TruncateTables(ctx, "wallet_transactions", "guilds"); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewWalletRepository(testDB)
+	g := &guild.Guild{ID: "created-guild", Gold: 1000, DailyLimit: 500, SpentOn: time.Now().UTC()}
+	if err := repo.Create(ctx, g); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Create(ctx, g); !errors.Is(err, guild.ErrGuildAlreadyExists) {
+		t.Fatalf("duplicate error=%v", err)
+	}
+	got, err := repo.Get(ctx, g.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Gold != g.Gold || got.DailyLimit != g.DailyLimit {
+		t.Fatalf("created guild=%+v", got)
 	}
 }

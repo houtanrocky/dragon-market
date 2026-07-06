@@ -31,6 +31,7 @@ func NewRouter(
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 
 	r.Get("/guilds/{id}/wallet", gh.Get)
+	r.Post("/guilds", gh.Create)
 
 	r.Post("/items", ih.Create)
 	r.Get("/items", ih.List)

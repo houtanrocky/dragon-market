@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"market-dragon/internal/gold"
+	"strings"
 	"time"
 )
 
@@ -23,6 +24,35 @@ type WalletServiceImpl struct {
 
 type transactionRecorder interface {
 	RecordWalletTransaction(ctx context.Context, guildID, operation string, amount gold.Amount, state *Guild) error
+}
+
+type guildCreator interface {
+	Create(ctx context.Context, guild *Guild) error
+}
+
+func (s *WalletServiceImpl) CreateGuild(ctx context.Context, id string, initialGold, dailyLimit gold.Amount) (*Guild, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, fmt.Errorf("%w: ID is required", ErrInvalidGuild)
+	}
+	if initialGold < 0 {
+		return nil, fmt.Errorf("%w: initial gold cannot be negative", ErrInvalidGuild)
+	}
+	if dailyLimit < 0 {
+		return nil, fmt.Errorf("%w: daily limit cannot be negative", ErrInvalidGuild)
+	}
+	creator, ok := s.guildRepository.(guildCreator)
+	if !ok {
+		return nil, errors.New("guild repository does not support creation")
+	}
+	g := &Guild{
+		ID: id, Gold: initialGold, DailyLimit: dailyLimit,
+		SpentOn: s.now().UTC().Truncate(24 * time.Hour),
+	}
+	if err := creator.Create(ctx, g); err != nil {
+		return nil, err
+	}
+	return g, nil
 }
 
 func NewWalletService(r GuildRepository, tx Transactor) *WalletServiceImpl {
