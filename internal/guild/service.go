@@ -53,7 +53,7 @@ func (s *WalletServiceImpl) save(ctx context.Context, g *Guild, operation string
 
 func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount gold.Amount) error {
 	if amount <= 0 {
-		return fmt.Errorf("amount must be positive")
+		return ErrInvalidAmount
 	}
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
@@ -68,10 +68,10 @@ func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount gold.
 
 		available := g.Gold - g.Reserved
 		if available < amount {
-			return fmt.Errorf("insufficient reserve: %v, amount: %v", available, amount)
+			return fmt.Errorf("%w: available %v, requested %v", ErrInsufficientBalance, available, amount)
 		}
 		if g.DailyLimit > 0 && g.DailySpent+amount > g.DailyLimit {
-			return fmt.Errorf("daily spend limit reached, spent: %v, limit: %v", g.DailySpent, g.DailyLimit)
+			return fmt.Errorf("%w: spent %v, limit %v", ErrDailyLimitReached, g.DailySpent, g.DailyLimit)
 		}
 		g.DailySpent += amount
 		g.Reserved += amount
@@ -81,7 +81,7 @@ func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount gold.
 
 func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount gold.Amount) error {
 	if amount <= 0 {
-		return fmt.Errorf("amount must be positive")
+		return ErrInvalidAmount
 	}
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
@@ -95,10 +95,10 @@ func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount gold.A
 		s.resetDailySpend(g)
 
 		if amount > g.Reserved {
-			return fmt.Errorf("insufficient reserve")
+			return ErrInsufficientReserve
 		}
 		if amount > g.Gold {
-			return fmt.Errorf("insufficient gold")
+			return ErrInsufficientBalance
 		}
 		g.Reserved -= amount
 		g.Gold -= amount
@@ -108,7 +108,7 @@ func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount gold.A
 
 func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount gold.Amount) error {
 	if amount <= 0 {
-		return fmt.Errorf("amount must be positive")
+		return ErrInvalidAmount
 	}
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
@@ -123,7 +123,7 @@ func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount gold.
 
 		enoughReserve := g.Reserved >= amount
 		if !enoughReserve {
-			return fmt.Errorf("insufficient available release: have %v need: %v", g.Reserved, amount)
+			return fmt.Errorf("%w: have %v, need %v", ErrInsufficientReserve, g.Reserved, amount)
 		}
 
 		if g.DailySpent > amount {
@@ -138,7 +138,7 @@ func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount gold.
 
 func (s *WalletServiceImpl) Earn(ctx context.Context, id string, amount gold.Amount) error {
 	if amount <= 0 {
-		return fmt.Errorf("amount must be positive")
+		return ErrInvalidAmount
 	}
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
@@ -158,7 +158,7 @@ func (s *WalletServiceImpl) Earn(ctx context.Context, id string, amount gold.Amo
 
 func (s *WalletServiceImpl) Spend(ctx context.Context, id string, amount gold.Amount) error {
 	if amount <= 0 {
-		return fmt.Errorf("amount must be positive")
+		return ErrInvalidAmount
 	}
 	return s.tx.RunInTransaction(ctx, func(ctx context.Context) error {
 		repo := s.guildRepository
@@ -173,10 +173,10 @@ func (s *WalletServiceImpl) Spend(ctx context.Context, id string, amount gold.Am
 
 		available := g.Gold - g.Reserved
 		if available < amount {
-			return fmt.Errorf("insufficient available balance: have: %v need: %v", available, amount)
+			return fmt.Errorf("%w: have %v, need %v", ErrInsufficientBalance, available, amount)
 		}
 		if g.DailyLimit > 0 && g.DailySpent+amount > g.DailyLimit {
-			return fmt.Errorf("daily spend limit reached, spent: %v, limit: %v", g.DailySpent, g.DailyLimit)
+			return fmt.Errorf("%w: spent %v, limit %v", ErrDailyLimitReached, g.DailySpent, g.DailyLimit)
 		}
 
 		g.DailySpent += amount

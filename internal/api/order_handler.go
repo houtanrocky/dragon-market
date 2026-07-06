@@ -98,6 +98,9 @@ func (h *orderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "owner not found", http.StatusNotFound)
 		return
 	}
+	if writeDomainError(w, err) {
+		return
+	}
 
 	if err != nil {
 		http.Error(w, "failed to create order", http.StatusInternalServerError)
@@ -174,6 +177,9 @@ func (h *orderHandler) Buy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "order is already not listed for sale", http.StatusBadRequest)
 		return
 	}
+	if writeDomainError(w, err) {
+		return
+	}
 	if err != nil {
 		http.Error(w, "failed to buy order", http.StatusInternalServerError)
 		slog.Error("failed to buy order", "error", err)
@@ -224,6 +230,9 @@ func (h *orderHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	}
 	if errors.Is(err, order.ErrCancelOrderListedByAnother) {
 		http.Error(w, "cannot cancel order that is listed by another user", http.StatusBadRequest)
+		return
+	}
+	if writeDomainError(w, err) {
 		return
 	}
 	if err != nil {

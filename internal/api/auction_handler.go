@@ -144,6 +144,9 @@ func (h *auctionHandler) Start(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "item is not owned by the seller", http.StatusNotFound)
 		return
 	}
+	if writeDomainError(w, err) {
+		return
+	}
 
 	if err != nil {
 		http.Error(w, "failed to create auction", http.StatusInternalServerError)
@@ -252,6 +255,9 @@ func (h *auctionHandler) PlaceBid(w http.ResponseWriter, r *http.Request) {
 
 	case errors.Is(err, idempotency.ErrNotCompleted):
 		http.Error(w, "request is already being processed", http.StatusConflict)
+		return
+
+	case writeDomainError(w, err):
 		return
 
 	case err != nil:

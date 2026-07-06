@@ -48,7 +48,7 @@ func NewOrderService(r OrderRepository, wSvc WalletService, iSvc ItemService, t 
 
 func (s *OrderServiceImpl) List(ctx context.Context, itemID, sellerID string, price gold.Amount) (*LimitOrder, error) {
 	if price <= 0 {
-		return nil, fmt.Errorf("price must be positive, got %v", price)
+		return nil, fmt.Errorf("%w: price must be positive, got %v", ErrInvalidOrder, price)
 	}
 
 	var order *LimitOrder
@@ -114,13 +114,13 @@ func (s *OrderServiceImpl) Buy(ctx context.Context, orderID, buyerID string) err
 			return ErrOrderNotListed
 		}
 		if o.SellerID == buyerID {
-			return fmt.Errorf("cannot buy your own listing")
+			return ErrCannotBuyOwnOrder
 		}
 		if it.OwnerID != o.SellerID {
-			return fmt.Errorf("seller no longer owns item")
+			return ErrOrderItemNotOwnedBySeller
 		}
 		if it.Status != item.ListedInOrder {
-			return fmt.Errorf("item is not listed in an order")
+			return ErrOrderItemNotAvailable
 		}
 
 		o.BuyerID = &buyerID

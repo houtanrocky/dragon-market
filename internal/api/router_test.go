@@ -4,6 +4,7 @@ import (
 	"context"
 	"market-dragon/internal/auction"
 	"market-dragon/internal/gold"
+	"market-dragon/internal/item"
 	"market-dragon/internal/order"
 	"net/http"
 	"net/http/httptest"
@@ -12,10 +13,13 @@ import (
 	"time"
 )
 
-type routeAuctionService struct{ value *auction.Auction }
+type routeAuctionService struct {
+	value    *auction.Auction
+	startErr error
+}
 
 func (s routeAuctionService) StartAuction(context.Context, string, string) (*auction.Auction, error) {
-	return nil, nil
+	return nil, s.startErr
 }
 func (s routeAuctionService) PlaceBid(context.Context, string, string, gold.Amount) (*auction.Bid, error) {
 	return nil, nil
@@ -31,10 +35,45 @@ func (s routeAuctionService) GetAuction(_ context.Context, id string) (*auction.
 	return nil, auction.ErrAuctionNotFound
 }
 
-type routeOrderService struct{ canceledID string }
+type routeOrderService struct {
+	canceledID string
+	listErr    error
+}
 
 func (s *routeOrderService) List(context.Context, string, string, gold.Amount) (*order.LimitOrder, error) {
-	return nil, nil
+	return nil, s.listErr
+}
+
+func TestRouter_MissingReferencedItemReturns404(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+		router http.Handler
+	}{
+		{
+			name: "order", method: http.MethodPost, path: "/orders",
+			body:   `{"item_id":"missing","owner_id":"seller","base_price":100}`,
+			router: NewRouter(nil, nil, routeAuctionService{}, &routeOrderService{listErr: item.ErrItemNotFound}, nil),
+		},
+		{
+			name: "auction", method: http.MethodPost, path: "/auctions",
+			body:   `{"item_id":"missing","seller_id":"seller"}`,
+			router: NewRouter(nil, nil, routeAuctionService{startErr: item.ErrItemNotFound}, nil, nil),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			recorder := httptest.NewRecorder()
+			tc.router.ServeHTTP(recorder, req)
+			if recorder.Code != http.StatusNotFound {
+				t.Fatalf("status=%d body=%q", recorder.Code, recorder.Body.String())
+			}
+		})
+	}
 }
 func (s *routeOrderService) Buy(context.Context, string, string) error { return nil }
 func (s *routeOrderService) Cancel(_ context.Context, id, _ string) error {
