@@ -18,6 +18,7 @@ type guildResponse struct {
 	Reserved   gold.Amount `json:"reserved"`
 	DailySpent gold.Amount `json:"daily_spent"`
 	DailyLimit gold.Amount `json:"daily_limit"`
+	Available  gold.Amount `json:"available"`
 }
 
 func newGuildResponse(g *guild.Guild) guildResponse {
@@ -27,6 +28,7 @@ func newGuildResponse(g *guild.Guild) guildResponse {
 		Reserved:   g.Reserved,
 		DailySpent: g.DailySpent,
 		DailyLimit: g.DailyLimit,
+		Available:  g.Gold - g.Reserved,
 	}
 }
 
