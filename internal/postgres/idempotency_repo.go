@@ -9,7 +9,11 @@ import (
 )
 
 type IdempotencyRepo struct {
-	db sql.DB
+	db *sql.DB
+}
+
+func NewIdempotencyRepo(db *sql.DB) *IdempotencyRepo {
+	return &IdempotencyRepo{db: db}
 }
 
 func (r *IdempotencyRepo) Claim(
@@ -19,6 +23,7 @@ func (r *IdempotencyRepo) Claim(
 	requestHash string,
 ) (record *idempotency.IdempotencyRecord, claimed bool, err error) {
 	q := r.conn(ctx)
+
 	row := q.QueryRowContext(ctx, `INSERT INTO idempotency_records (key, operation, request_hash)
 	  VALUES ($1, $2, $3)
 	  ON CONFLICT (key) DO NOTHING
@@ -71,6 +76,28 @@ func (r *IdempotencyRepo) Complete(
 	statusCode int,
 	response json.RawMessage,
 ) error {
+	q := r.conn(ctx)
+
+	res, err := q.ExecContext(ctx, `
+		UPDATE idempotency_records SET
+		  status_code = $2,
+		  response = $3
+		  completed_at = NOW()
+		WHERE key = $1
+		  AND completed_at IS NULL
+	`, key, statusCode, response)
+	if err != nil {
+		return err
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return idempotency.ErrNotCompleted
+	}
+
 	return nil
 }
 
@@ -79,5 +106,5 @@ func (r *IdempotencyRepo) conn(ctx context.Context) querier {
 		return tx
 	}
 
-	return &r.db
+	return r.db
 }
