@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"market-dragon/internal/gold"
 	"market-dragon/internal/item"
 )
 
@@ -74,6 +75,42 @@ func (r *ItemRepository) ListFree(ctx context.Context) ([]*item.Item, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+func (r *ItemRepository) ListItemIDs(ctx context.Context) ([]string, error) {
+	rows, err := r.itemConn(ctx).QueryContext(ctx, `SELECT id FROM items ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (r *ItemRepository) UpdateBasePrice(ctx context.Context, id string, price gold.Amount) error {
+	if price <= 0 {
+		return fmt.Errorf("base price must be positive")
+	}
+	result, err := r.itemConn(ctx).ExecContext(ctx,
+		`UPDATE items SET base_price = $2 WHERE id = $1`, id, price)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return item.ErrItemNotFound
+	}
+	return nil
 }
 
 func (r *ItemRepository) MarkListedInAuction(ctx context.Context, id, sellerID string) error {

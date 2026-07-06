@@ -122,7 +122,7 @@ func TestIdempotencyRepository_Claim_RollbackMakesKeyClaimable(t *testing.T) {
 	ctx := context.Background()
 	truncateIdempotencyRecords(t, ctx)
 	repo := NewIdempotencyRepo(testDB)
-	tx := NewWalletRepository(testDB)
+	tx := NewTransactor(testDB)
 	rollbackErr := errors.New("force rollback")
 
 	err := tx.RunInTransaction(ctx, func(txCtx context.Context) error {

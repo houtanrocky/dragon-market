@@ -1,6 +1,7 @@
 package api
 
 import (
+	"market-dragon/internal/idempotency"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -12,6 +13,7 @@ func NewRouter(
 	itemSvc ItemService,
 	auctionSvc AuctionService,
 	orderSvc OrderService,
+	idemSvc *idempotency.IdempotencyService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -20,7 +22,10 @@ func NewRouter(
 
 	gh := &guildHandler{svc: guildSvc}
 	ih := &itemHandler{svc: itemSvc}
-	ah := &auctionHandler{svc: auctionSvc}
+	ah := &auctionHandler{
+		svc:     auctionSvc,
+		idemSvc: idemSvc,
+	}
 	oh := &orderHandler{svc: orderSvc}
 
 	r.Get("/guilds/{id}/wallet", gh.Get)

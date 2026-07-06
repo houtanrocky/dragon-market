@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"market-dragon/internal/idempotency"
+	"market-dragon/internal/oracle"
 	"net/http"
 	"os"
 	"os/signal"
@@ -59,26 +61,46 @@ func run() error {
 	orderRepo := postgres.NewOrderRepository(db)
 	auctionRepo := postgres.NewAuctionRepository(db)
 
-	walletSvc := guild.NewWalletService(guildRepo, guildRepo)
+	tx := postgres.NewTransactor(db)
+
+	walletSvc := guild.NewWalletService(guildRepo, tx)
 	itemSvc := item.NewItemService(itemRepo, guildRepo)
 	orderSvc := order.NewOrderService(
 		orderRepo,
 		walletSvc,
 		itemSvc,
-		guildRepo,
+		tx,
 	)
 	auctionSvc := auction.NewAuctionService(
 		auctionRepo,
 		walletSvc,
 		itemSvc,
-		guildRepo,
+		tx,
 	)
+
+	idemRepo := postgres.NewIdempotencyRepo(db)
+	idemSvc := idempotency.NewService(idemRepo, tx)
+
+	if oracleURL := os.Getenv("PRICE_ORACLE_URL"); oracleURL != "" {
+		client, err := oracle.NewHTTPOracle(oracleURL, nil)
+		if err != nil {
+			return err
+		}
+		priceUpdater := oracle.NewUpdater(
+			oracle.NewResilientOracle(client),
+			itemRepo,
+			30*time.Second,
+			func(err error) { slog.Warn("price oracle refresh failed", "error", err) },
+		)
+		go priceUpdater.Run(ctx)
+	}
 
 	handler := api.NewRouter(
 		walletSvc,
 		itemSvc,
 		auctionSvc,
 		orderSvc,
+		idemSvc,
 	)
 
 	server := &http.Server{

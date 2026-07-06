@@ -22,24 +22,33 @@ func getTx(ctx context.Context) *sql.Tx {
 	return tx
 }
 
-func (r *Repository) RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
+type Transactor struct {
+	db *sql.DB
+}
+
+func NewTransactor(db *sql.DB) *Transactor {
+	return &Transactor{db: db}
+}
+
+func (t *Transactor) RunInTransaction(
+	ctx context.Context,
+	fn func(context.Context) error,
+) error {
 	if getTx(ctx) != nil {
 		return fn(ctx)
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := t.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
+
 	txCtx := withTx(ctx, tx)
-	err = fn(txCtx)
-	if err != nil {
+
+	if err := fn(txCtx); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
-	return tx.Commit()
-}
 
-type Transactor struct {
-	db *sql.DB
+	return tx.Commit()
 }

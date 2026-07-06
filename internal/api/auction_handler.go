@@ -7,8 +7,11 @@ import (
 	"io"
 	"log/slog"
 	"market-dragon/internal/gold"
+	"market-dragon/internal/idempotency"
 	"mime"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"market-dragon/internal/auction"
@@ -40,9 +43,8 @@ func newAuctionResponse(a *auction.Auction) auctionResponse {
 
 // -- place bid req
 type placeBidRequest struct {
-	AuctionID string      `json:"auction_id"`
-	BidderID  string      `json:"bidder_id"`
-	Amount    gold.Amount `json:"amount"`
+	BidderID string      `json:"bidder_id"`
+	Amount   gold.Amount `json:"amount"`
 }
 type placeBidResponse struct {
 	ID        string            `json:"id"`
@@ -84,7 +86,8 @@ type AuctionService interface {
 }
 
 type auctionHandler struct {
-	svc AuctionService
+	svc     AuctionService
+	idemSvc *idempotency.IdempotencyService
 }
 
 // Start POST /auctions
@@ -150,6 +153,12 @@ func (h *auctionHandler) PlaceBid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if key == "" {
+		http.Error(w, "Idempotency-Key header is required", http.StatusBadRequest)
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
 	var req placeBidRequest
@@ -165,26 +174,81 @@ func (h *auctionHandler) PlaceBid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bid, err := h.svc.PlaceBid(r.Context(), req.AuctionID, req.BidderID, req.Amount)
-
-	if err != nil {
-		http.Error(w, "failed to place bid", http.StatusInternalServerError)
-		slog.Error("failed to place bid", "error", err)
+	auctionID := chi.URLParam(r, "id")
+	if auctionID == "" {
+		http.Error(w, "auction ID is required", http.StatusBadRequest)
 		return
 	}
 
-	if bid == nil {
+	req.BidderID = strings.TrimSpace(req.BidderID)
+	if req.BidderID == "" {
+		http.Error(w, "bidder ID is required", http.StatusBadRequest)
+		return
+	}
+
+	requestHash := idempotency.Hash(
+		auctionID,
+		req.BidderID,
+		strconv.FormatInt(int64(req.Amount), 10),
+	)
+
+	result, err := h.idemSvc.Execute(
+		r.Context(),
+		key,
+		"auction.place_bid",
+		requestHash,
+		func(txCtx context.Context) (int, json.RawMessage, error) {
+			bid, err := h.svc.PlaceBid(
+				txCtx,
+				auctionID,
+				req.BidderID,
+				req.Amount,
+			)
+			if err != nil {
+				return 0, nil, err
+			}
+			if bid == nil {
+				return 0, nil, errors.New("PlaceBid returned nil without error")
+			}
+
+			response, err := json.Marshal(newPlaceBidResponse(bid))
+			if err != nil {
+				return 0, nil, err
+			}
+
+			return http.StatusCreated, response, nil
+		},
+	)
+
+	switch {
+	case errors.Is(err, idempotency.ErrKeyConflict):
+		http.Error(
+			w,
+			"idempotency key conflicts with another request",
+			http.StatusConflict,
+		)
+		return
+
+	case errors.Is(err, idempotency.ErrNotCompleted):
+		http.Error(w, "request is already being processed", http.StatusConflict)
+		return
+
+	case err != nil:
+		slog.Error("failed to place bid", "error", err)
 		http.Error(w, "failed to place bid", http.StatusInternalServerError)
-		slog.Error("PlaceBid returned nil without error")
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-
-	if err := json.NewEncoder(w).Encode(newPlaceBidResponse(bid)); err != nil {
-		slog.Error("encode auction response", "error", err)
+	if result.Replayed {
+		w.Header().Set("Idempotency-Replayed", "true")
 	}
+	w.WriteHeader(result.StatusCode)
+
+	if _, err := w.Write(result.Response); err != nil {
+		slog.Error("write auction response", "error", err)
+	}
+
 }
 
 func (h *auctionHandler) GetBid(w http.ResponseWriter, r *http.Request) {
