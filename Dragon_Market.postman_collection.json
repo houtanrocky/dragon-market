@@ -1,0 +1,308 @@
+{
+  "info": {
+    "_postman_id": "d57de59e-c74e-4c64-b16c-cb305cd101c3",
+    "name": "Dragon Market API",
+    "description": "Complete API collection for the Aethoria Dragon Market challenge. Before running requests, seed guild-seller, guild-buyer, and guild-bidder in PostgreSQL because the application has no guild-creation endpoint.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080", "type": "string" },
+    { "key": "seller_id", "value": "guild-seller", "type": "string" },
+    { "key": "buyer_id", "value": "guild-buyer", "type": "string" },
+    { "key": "bidder_id", "value": "guild-bidder", "type": "string" },
+    { "key": "item_id", "value": "", "type": "string" },
+    { "key": "legendary_item_id", "value": "", "type": "string" },
+    { "key": "order_id", "value": "", "type": "string" },
+    { "key": "auction_id", "value": "", "type": "string" },
+    { "key": "bid_id", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/healthz", "host": ["{{base_url}}"], "path": ["healthz"] },
+            "description": "Returns 200 when the API process is healthy."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Guild Wallets",
+      "item": [
+        {
+          "name": "Get Seller Wallet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/guilds/{{seller_id}}/wallet", "host": ["{{base_url}}"], "path": ["guilds", "{{seller_id}}", "wallet"] }
+          }
+        },
+        {
+          "name": "Get Buyer Wallet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/guilds/{{buyer_id}}/wallet", "host": ["{{base_url}}"], "path": ["guilds", "{{buyer_id}}", "wallet"] }
+          }
+        },
+        {
+          "name": "Get Bidder Wallet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/guilds/{{bidder_id}}/wallet", "host": ["{{base_url}}"], "path": ["guilds", "{{bidder_id}}", "wallet"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Items",
+      "item": [
+        {
+          "name": "Create Rare Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('item_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Arcane Wand {{$randomUUID}}\",\n  \"type\": \"rare\",\n  \"owner_id\": \"{{seller_id}}\",\n  \"base_price\": 500\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/items", "host": ["{{base_url}}"], "path": ["items"] }
+          }
+        },
+        {
+          "name": "Create Legendary Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('legendary_item_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Soul Reaver {{$randomUUID}}\",\n  \"type\": \"legendary\",\n  \"owner_id\": \"{{seller_id}}\",\n  \"base_price\": 2000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/items", "host": ["{{base_url}}"], "path": ["items"] }
+          }
+        },
+        {
+          "name": "List Free Items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/items", "host": ["{{base_url}}"], "path": ["items"] }
+          }
+        },
+        {
+          "name": "Get Rare Item",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/items/{{item_id}}", "host": ["{{base_url}}"], "path": ["items", "{{item_id}}"] }
+          }
+        },
+        {
+          "name": "Get Legendary Item",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/items/{{legendary_item_id}}", "host": ["{{base_url}}"], "path": ["items", "{{legendary_item_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Limit Orders",
+      "item": [
+        {
+          "name": "Create Limit Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('order_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item_id\": \"{{item_id}}\",\n  \"owner_id\": \"{{seller_id}}\",\n  \"base_price\": 700\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/orders", "host": ["{{base_url}}"], "path": ["orders"] }
+          }
+        },
+        {
+          "name": "Buy Limit Order",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.variables.set('idempotency_key', 'buy-' + pm.variables.replaceIn('{{$randomUUID}}'));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Idempotency-Key", "value": "{{idempotency_key}}", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"buyer_id\": \"{{buyer_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/orders/{{order_id}}/buy", "host": ["{{base_url}}"], "path": ["orders", "{{order_id}}", "buy"] },
+            "description": "Expected 204. To test replay behavior, temporarily disable the pre-request script and resend with the same Idempotency-Key."
+          }
+        },
+        {
+          "name": "Cancel Limit Order",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seller_id\": \"{{seller_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/orders/{{order_id}}", "host": ["{{base_url}}"], "path": ["orders", "{{order_id}}"] },
+            "description": "Run instead of Buy Limit Order, or create another item and order first."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auctions",
+      "item": [
+        {
+          "name": "Start Legendary Auction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('auction_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item_id\": \"{{legendary_item_id}}\",\n  \"seller_id\": \"{{seller_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/auctions", "host": ["{{base_url}}"], "path": ["auctions"] }
+          }
+        },
+        {
+          "name": "Get Auction",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/auctions/{{auction_id}}", "host": ["{{base_url}}"], "path": ["auctions", "{{auction_id}}"] }
+          }
+        },
+        {
+          "name": "Place Bid",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.variables.set('idempotency_key', 'bid-' + pm.variables.replaceIn('{{$randomUUID}}'));"]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('bid_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Idempotency-Key", "value": "{{idempotency_key}}", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bidder_id\": \"{{bidder_id}}\",\n  \"amount\": 2500\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/auctions/{{auction_id}}/bids", "host": ["{{base_url}}"], "path": ["auctions", "{{auction_id}}", "bids"] }
+          }
+        },
+        {
+          "name": "Get Bid",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/bids/{{bid_id}}", "host": ["{{base_url}}"], "path": ["bids", "{{bid_id}}"] }
+          }
+        },
+        {
+          "name": "Cancel Highest Bid",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auctions/{{auction_id}}/bids/{{bid_id}}?bidder_id={{bidder_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["auctions", "{{auction_id}}", "bids", "{{bid_id}}"],
+              "query": [{ "key": "bidder_id", "value": "{{bidder_id}}" }]
+            },
+            "description": "Only the current active highest bid can be cancelled. Expected 204."
+          }
+        }
+      ]
+    }
+  ]
+}
