@@ -27,16 +27,18 @@ type startAuctionRequest struct {
 
 type auctionResponse struct {
 	ID       string                `json:"id"`
-	Name     string                `json:"name"`
-	SellerID string                `json:"type"`
+	ItemID   string                `json:"item_id"`
+	SellerID string                `json:"seller_id"`
+	EndsAt   time.Time             `json:"ends_at"`
 	Status   auction.AuctionStatus `json:"status"`
 }
 
 func newAuctionResponse(a *auction.Auction) auctionResponse {
 	return auctionResponse{
 		ID:       a.ID,
-		Name:     a.ItemID,
+		ItemID:   a.ItemID,
 		SellerID: a.SellerID,
+		EndsAt:   a.EndsAt,
 		Status:   a.Status,
 	}
 }
@@ -83,6 +85,25 @@ type AuctionService interface {
 	CancelBid(ctx context.Context, auctionID, bidID, bidderID string) error
 	EndAuction(ctx context.Context, auctionID string) error
 	GetBid(ctx context.Context, id string) (*auction.Bid, error)
+	GetAuction(ctx context.Context, id string) (*auction.Auction, error)
+	EndExpiredAuctions(ctx context.Context, limit int) error
+}
+
+func (h *auctionHandler) GetAuction(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	a, err := h.svc.GetAuction(r.Context(), id)
+	if errors.Is(err, auction.ErrAuctionNotFound) {
+		http.Error(w, "auction not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "failed to get auction", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(newAuctionResponse(a)); err != nil {
+		slog.Error("encode auction response", "error", err)
+	}
 }
 
 type auctionHandler struct {
@@ -295,25 +316,13 @@ func (h *auctionHandler) CancelBid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bid, err := h.svc.GetBid(r.Context(), bidID)
-	switch {
-	case errors.Is(err, auction.ErrBidNotFound):
-		http.Error(w, "bid not found", http.StatusNotFound)
-		return
-	case err != nil:
-		slog.Error("get bid", "bid_id", bidID, "error", err)
-		http.Error(w, "failed to get bid", http.StatusInternalServerError)
-		return
-	case bid == nil:
-		slog.Error("get bid returned nil", "bid_id", bidID)
-		http.Error(w, "failed to get bid", http.StatusInternalServerError)
-		return
-	case bid.AuctionID != auctionID:
-		http.Error(w, "bid not found for this auction", http.StatusNotFound)
+	bidderID := strings.TrimSpace(r.URL.Query().Get("bidder_id"))
+	if bidderID == "" {
+		http.Error(w, "bidder_id query parameter is required", http.StatusBadRequest)
 		return
 	}
 
-	err = h.svc.CancelBid(r.Context(), auctionID, bidID, bid.BidderID)
+	err := h.svc.CancelBid(r.Context(), auctionID, bidID, bidderID)
 	switch {
 	case errors.Is(err, auction.ErrBidNotFound):
 		http.Error(w, "bid not found", http.StatusNotFound)

@@ -61,6 +61,19 @@ func (r *mockAuctionRepository) GetActiveAuctionByItemID(_ context.Context, id s
 	return nil, ErrAuctionNotFound
 }
 
+func (r *mockAuctionRepository) ListExpiredActiveAuctionIDs(_ context.Context, now time.Time, limit int) ([]string, error) {
+	var ids []string
+	for id, a := range r.auctions {
+		if a.Status == ActiveAuction && !a.EndsAt.After(now) {
+			ids = append(ids, id)
+			if len(ids) == limit {
+				break
+			}
+		}
+	}
+	return ids, nil
+}
+
 func (r *mockAuctionRepository) ExtendActiveAuction(_ context.Context, id string, endsAt time.Time) error {
 	a, err := r.GetAuctionByID(context.Background(), id)
 	if err != nil || a.Status != ActiveAuction {
@@ -110,9 +123,9 @@ func (r *mockAuctionRepository) MarkBidOutbid(_ context.Context, id string) erro
 	return nil
 }
 
-func (r *mockAuctionRepository) CancelOutbidBid(_ context.Context, auctionID, bidID, bidderID string) error {
+func (r *mockAuctionRepository) CancelActiveBid(_ context.Context, auctionID, bidID, bidderID string) error {
 	b, err := r.GetBidByID(context.Background(), bidID)
-	if err != nil || b.AuctionID != auctionID || b.BidderID != bidderID || b.Status != OutbidBid {
+	if err != nil || b.AuctionID != auctionID || b.BidderID != bidderID || b.Status != ActiveBid {
 		return ErrBidNotCancellable
 	}
 	b.Status = CancelledBid
@@ -250,16 +263,16 @@ func TestService_PlaceBid_RejectsLowIncrement(t *testing.T) {
 	}
 }
 
-func TestService_CancelBid_CancelsOutbidWithoutReleasingAgain(t *testing.T) {
+func TestService_CancelBid_CancelsHighestAndReleasesReservation(t *testing.T) {
 	repo, wallet, items := newMockAuctionRepository(), &mockWallet{}, newMockItems()
 	repo.auctions[auctionID] = activeAuction(fixedNow.Add(time.Hour))
-	repo.bids["old"] = &Bid{ID: "old", AuctionID: auctionID, BidderID: bidder1, Amount: 100, Status: OutbidBid}
+	repo.bids["old"] = &Bid{ID: "old", AuctionID: auctionID, BidderID: bidder1, Amount: 100, Status: ActiveBid}
 	svc := newService(repo, wallet, items, fixedNow)
 
 	if err := svc.CancelBid(context.Background(), auctionID, "old", bidder1); err != nil {
 		t.Fatalf("CancelBid() error = %v", err)
 	}
-	if repo.bids["old"].Status != CancelledBid || len(wallet.released) != 0 {
+	if repo.bids["old"].Status != CancelledBid || len(wallet.released) != 1 {
 		t.Fatal("cancel did not preserve reservation invariant")
 	}
 }

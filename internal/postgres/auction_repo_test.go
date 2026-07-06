@@ -43,10 +43,7 @@ func TestAuctionRepository_Lifecycle(t *testing.T) {
 	if _, err := repo.CreateBid(ctx, b); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.MarkBidOutbid(ctx, b.ID); err != nil {
-		t.Fatal(err)
-	}
-	if err := repo.CancelOutbidBid(ctx, a.ID, b.ID, b.BidderID); err != nil {
+	if err := repo.CancelActiveBid(ctx, a.ID, b.ID, b.BidderID); err != nil {
 		t.Fatal(err)
 	}
 	got, err := repo.GetBidByID(ctx, b.ID)

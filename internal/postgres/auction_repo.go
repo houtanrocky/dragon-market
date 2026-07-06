@@ -55,6 +55,27 @@ func (r *AuctionRepository) GetActiveAuctionByItemID(ctx context.Context, itemID
 	return &a, nil
 }
 
+func (r *AuctionRepository) ListExpiredActiveAuctionIDs(ctx context.Context, now time.Time, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := r.conn(ctx).QueryContext(ctx, `SELECT id FROM auctions
+		WHERE status = 'active' AND ends_at <= $1 ORDER BY ends_at LIMIT $2`, now, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (r *AuctionRepository) ExtendActiveAuction(ctx context.Context, id string, endsAt time.Time) error {
 	return expectOne(r.conn(ctx).ExecContext(ctx,
 		`UPDATE auctions SET ends_at = $2 WHERE id = $1 AND status = 'active'`, id, endsAt))
@@ -114,9 +135,9 @@ func (r *AuctionRepository) MarkBidOutbid(ctx context.Context, id string) error 
 		`UPDATE bids SET status = 'outbid' WHERE id = $1 AND status = 'active'`, id))
 }
 
-func (r *AuctionRepository) CancelOutbidBid(ctx context.Context, auctionID, bidID, bidderID string) error {
+func (r *AuctionRepository) CancelActiveBid(ctx context.Context, auctionID, bidID, bidderID string) error {
 	result, err := r.conn(ctx).ExecContext(ctx, `UPDATE bids SET status = 'cancelled'
-		WHERE id = $1 AND auction_id = $2 AND bidder_id = $3 AND status = 'outbid'`,
+		WHERE id = $1 AND auction_id = $2 AND bidder_id = $3 AND status = 'active'`,
 		bidID, auctionID, bidderID)
 	if err != nil {
 		return err

@@ -10,6 +10,7 @@ import (
 type AuctionRepository interface {
 	CreateAuction(ctx context.Context, auction *Auction) error
 	GetAuctionByID(ctx context.Context, auctionID string) (*Auction, error)
+	ListExpiredActiveAuctionIDs(ctx context.Context, now time.Time, limit int) ([]string, error)
 	GetActiveAuctionByItemID(ctx context.Context, itemID string) (*Auction, error)
 	ExtendActiveAuction(ctx context.Context, auctionID string, endsAt time.Time) error
 	EndActiveAuction(ctx context.Context, auctionID string) error
@@ -18,6 +19,6 @@ type AuctionRepository interface {
 	GetBidByID(ctx context.Context, bidID string) (*Bid, error)
 	GetTopActiveBid(ctx context.Context, auctionID string) (*Bid, error)
 	MarkBidOutbid(ctx context.Context, bidID string) error
-	CancelOutbidBid(ctx context.Context, auctionID, bidID, bidderID string) error
+	CancelActiveBid(ctx context.Context, auctionID, bidID, bidderID string) error
 	MarkBidWinning(ctx context.Context, bidID string) error
 }
