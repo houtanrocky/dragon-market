@@ -37,7 +37,7 @@ func (r *IdempotencyRepo) Claim(
 		  completed_at;`, key, operation, requestHash)
 
 	var idem idempotency.IdempotencyRecord
-	err = row.Scan(&idem.Key, &idem.Operation, &idem.RequestHash, &idem.StatusCode, &idem.Response, &idem.CreatedAt, &idem.CompletedAt)
+	err = scanIdempotencyRecord(row, &idem)
 	if errors.Is(err, sql.ErrNoRows) {
 		exRow := q.QueryRowContext(ctx, `SELECT
 		  key,
@@ -51,7 +51,7 @@ func (r *IdempotencyRepo) Claim(
   		WHERE key = $1;`, key)
 
 		var existing idempotency.IdempotencyRecord
-		err := exRow.Scan(&existing.Key, &existing.Operation, &existing.RequestHash, &existing.StatusCode, &existing.Response, &existing.CreatedAt, &existing.CompletedAt)
+		err := scanIdempotencyRecord(exRow, &existing)
 		if err != nil {
 			return nil, false, err
 		}
@@ -81,7 +81,7 @@ func (r *IdempotencyRepo) Complete(
 	res, err := q.ExecContext(ctx, `
 		UPDATE idempotency_records SET
 		  status_code = $2,
-		  response = $3
+		  response = $3,
 		  completed_at = NOW()
 		WHERE key = $1
 		  AND completed_at IS NULL
@@ -107,4 +107,38 @@ func (r *IdempotencyRepo) conn(ctx context.Context) querier {
 	}
 
 	return r.db
+}
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanIdempotencyRecord(row rowScanner, record *idempotency.IdempotencyRecord) error {
+	var statusCode sql.NullInt64
+	var response []byte
+	var completedAt sql.NullTime
+
+	if err := row.Scan(
+		&record.Key,
+		&record.Operation,
+		&record.RequestHash,
+		&statusCode,
+		&response,
+		&record.CreatedAt,
+		&completedAt,
+	); err != nil {
+		return err
+	}
+
+	if statusCode.Valid {
+		value := int(statusCode.Int64)
+		record.StatusCode = &value
+	}
+	record.Response = json.RawMessage(response)
+	if completedAt.Valid {
+		value := completedAt.Time
+		record.CompletedAt = &value
+	}
+
+	return nil
 }
