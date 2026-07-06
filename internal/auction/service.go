@@ -54,9 +54,19 @@ func WithClock(clock Clock) Option {
 	return func(service *AuctionServiceImpl) { service.clock = clock }
 }
 
-//func WithConfig(config Config) Option {
-//	return func(service *AuctionServiceImpl) { service.config = config }
-//}
+func WithConfig(config Config) Option {
+	return func(service *AuctionServiceImpl) {
+		if config.Duration > 0 {
+			service.config.Duration = config.Duration
+		}
+		if config.ExtensionWindow > 0 {
+			service.config.ExtensionWindow = config.ExtensionWindow
+		}
+		if config.Extension > 0 {
+			service.config.Extension = config.Extension
+		}
+	}
+}
 
 type AuctionServiceImpl struct {
 	repo          AuctionRepository
@@ -220,11 +230,37 @@ func (s *AuctionServiceImpl) CancelBid(ctx context.Context, auctionID, bidID, bi
 		if err != nil {
 			return err
 		}
-		if bid.AuctionID != auctionID || bid.BidderID != bidderID || bid.Status != OutbidBid {
+		if bid.AuctionID != auctionID || bid.BidderID != bidderID || bid.Status != ActiveBid {
 			return ErrBidNotCancellable
 		}
-		return s.repo.CancelOutbidBid(ctx, auctionID, bidID, bidderID)
+		top, err := s.repo.GetTopActiveBid(ctx, auctionID)
+		if err != nil || top.ID != bidID {
+			return ErrBidNotCancellable
+		}
+		if err := s.walletService.Release(ctx, bidderID, bid.Amount); err != nil {
+			return err
+		}
+		return s.repo.CancelActiveBid(ctx, auctionID, bidID, bidderID)
 	})
+}
+
+func (s *AuctionServiceImpl) GetAuction(ctx context.Context, auctionID string) (*Auction, error) {
+	return s.repo.GetAuctionByID(ctx, auctionID)
+}
+
+// EndExpiredAuctions settles a bounded batch. EndAuction locks each auction,
+// making repeated or concurrent worker runs safe.
+func (s *AuctionServiceImpl) EndExpiredAuctions(ctx context.Context, limit int) error {
+	ids, err := s.repo.ListExpiredActiveAuctionIDs(ctx, s.clock.Now(), limit)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := s.EndAuction(ctx, id); err != nil && !errors.Is(err, ErrAuctionNotActive) {
+			return fmt.Errorf("end auction %s: %w", id, err)
+		}
+	}
+	return nil
 }
 
 func (s *AuctionServiceImpl) EndAuction(ctx context.Context, auctionID string) error {

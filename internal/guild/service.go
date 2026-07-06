@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"market-dragon/internal/gold"
+	"time"
 )
 
 type Transactor interface {
@@ -17,10 +18,37 @@ type Transactor interface {
 type WalletServiceImpl struct {
 	guildRepository GuildRepository
 	tx              Transactor
+	now             func() time.Time
+}
+
+type transactionRecorder interface {
+	RecordWalletTransaction(ctx context.Context, guildID, operation string, amount gold.Amount, state *Guild) error
 }
 
 func NewWalletService(r GuildRepository, tx Transactor) *WalletServiceImpl {
-	return &WalletServiceImpl{guildRepository: r, tx: tx}
+	return &WalletServiceImpl{guildRepository: r, tx: tx, now: time.Now}
+}
+
+func (s *WalletServiceImpl) resetDailySpend(g *Guild) {
+	today := s.now().UTC().Truncate(24 * time.Hour)
+	if g.SpentOn.IsZero() {
+		g.SpentOn = today
+		return
+	}
+	if g.SpentOn.UTC().Truncate(24*time.Hour) != today {
+		g.DailySpent = 0
+		g.SpentOn = today
+	}
+}
+
+func (s *WalletServiceImpl) save(ctx context.Context, g *Guild, operation string, amount gold.Amount) error {
+	if err := s.guildRepository.Update(ctx, g); err != nil {
+		return err
+	}
+	if recorder, ok := s.guildRepository.(transactionRecorder); ok {
+		return recorder.RecordWalletTransaction(ctx, g.ID, operation, amount, g)
+	}
+	return nil
 }
 
 func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount gold.Amount) error {
@@ -36,6 +64,7 @@ func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount gold.
 		if err != nil {
 			return err
 		}
+		s.resetDailySpend(g)
 
 		available := g.Gold - g.Reserved
 		if available < amount {
@@ -46,7 +75,7 @@ func (s *WalletServiceImpl) Reserve(ctx context.Context, id string, amount gold.
 		}
 		g.DailySpent += amount
 		g.Reserved += amount
-		return repo.Update(ctx, g)
+		return s.save(ctx, g, "reserve", amount)
 	})
 }
 
@@ -63,6 +92,7 @@ func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount gold.A
 		if err != nil {
 			return err
 		}
+		s.resetDailySpend(g)
 
 		if amount > g.Reserved {
 			return fmt.Errorf("insufficient reserve")
@@ -72,7 +102,7 @@ func (s *WalletServiceImpl) Deduct(ctx context.Context, id string, amount gold.A
 		}
 		g.Reserved -= amount
 		g.Gold -= amount
-		return repo.Update(ctx, g)
+		return s.save(ctx, g, "deduct", amount)
 	})
 }
 
@@ -89,6 +119,7 @@ func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount gold.
 		if err != nil {
 			return err
 		}
+		s.resetDailySpend(g)
 
 		enoughReserve := g.Reserved >= amount
 		if !enoughReserve {
@@ -101,7 +132,7 @@ func (s *WalletServiceImpl) Release(ctx context.Context, id string, amount gold.
 			g.DailySpent = 0
 		}
 		g.Reserved -= amount
-		return repo.Update(ctx, g)
+		return s.save(ctx, g, "release", amount)
 	})
 }
 
@@ -118,9 +149,10 @@ func (s *WalletServiceImpl) Earn(ctx context.Context, id string, amount gold.Amo
 		if err != nil {
 			return err
 		}
+		s.resetDailySpend(g)
 
 		g.Gold += amount
-		return repo.Update(ctx, g)
+		return s.save(ctx, g, "earn", amount)
 	})
 }
 
@@ -137,6 +169,7 @@ func (s *WalletServiceImpl) Spend(ctx context.Context, id string, amount gold.Am
 		if err != nil {
 			return err
 		}
+		s.resetDailySpend(g)
 
 		available := g.Gold - g.Reserved
 		if available < amount {
@@ -148,7 +181,7 @@ func (s *WalletServiceImpl) Spend(ctx context.Context, id string, amount gold.Am
 
 		g.DailySpent += amount
 		g.Gold -= amount
-		return repo.Update(ctx, g)
+		return s.save(ctx, g, "spend", amount)
 	})
 }
 

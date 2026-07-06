@@ -77,6 +77,7 @@ func run() error {
 		itemSvc,
 		tx,
 	)
+	go auction.RunSettlementWorker(ctx, auctionSvc, time.Minute)
 
 	idemRepo := postgres.NewIdempotencyRepo(db)
 	idemSvc := idempotency.NewService(idemRepo, tx)

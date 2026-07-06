@@ -3,7 +3,25 @@ package guild
 import (
 	"context"
 	"testing"
+	"time"
 )
+
+func TestWallet_Service_Reserve_ResetsSpentOnNewDay(t *testing.T) {
+	today := time.Date(2026, 7, 6, 12, 0, 0, 0, time.UTC)
+	repo := MockGuildRepo{guilds: map[string]*Guild{"guild-1": {
+		ID: "guild-1", Gold: 1000, DailyLimit: 200, DailySpent: 200, SpentOn: today.AddDate(0, 0, -1),
+	}}}
+	svc := NewWalletService(&repo, &MockTransactor{})
+	svc.now = func() time.Time { return today }
+
+	if err := svc.Reserve(context.Background(), "guild-1", 100); err != nil {
+		t.Fatal(err)
+	}
+	g := repo.guilds["guild-1"]
+	if g.DailySpent != 100 || !g.SpentOn.Equal(today.Truncate(24*time.Hour)) {
+		t.Fatalf("daily spent=%d spent on=%v", g.DailySpent, g.SpentOn)
+	}
+}
 
 type MockGuildRepo struct {
 	guilds map[string]*Guild
