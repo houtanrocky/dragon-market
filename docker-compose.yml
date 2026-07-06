@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
@@ -10,3 +9,9 @@ services:
       - "5432:5432"
     volumes:
       - ./migrations/up:/docker-entrypoint-initdb.d:ro
+  oracle:
+    build:
+      context: .
+      dockerfile: Dockerfile.oracle
+    ports:
+      - "8090:8090"
