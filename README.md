@@ -16,6 +16,15 @@ Requirements: Go 1.25+, Docker, and Docker Compose.
 docker compose up -d postgres oracle
 ```
 
+On a fresh PostgreSQL container, Compose also runs `dev/seed.sql` and creates
+`guild-seller`, `guild-buyer`, and `guild-bidder` with 10,000 gold each. The
+script is idempotent and development-only. If PostgreSQL was initialized
+before the seed was added, apply it once with:
+
+```sh
+docker compose exec -T postgres psql -U market -d market -f /docker-entrypoint-initdb.d/999_seed.sql
+```
+
 Then run the API. PowerShell:
 
 ```powershell
