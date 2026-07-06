@@ -1,0 +1,11 @@
+FROM golang:1.25-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/mock-oracle ./cmd/mock-oracle
+RUN CGO_ENABLED=0 go build -o /mock-oracle ./cmd/mock-oracle
+
+FROM alpine:3.22
+COPY --from=build /mock-oracle /usr/local/bin/mock-oracle
+EXPOSE 8090
+ENTRYPOINT ["mock-oracle"]
