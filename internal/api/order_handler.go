@@ -7,9 +7,12 @@ import (
 	"io"
 	"log/slog"
 	"market-dragon/internal/gold"
+	"market-dragon/internal/idempotency"
 	"mime"
 	"net/http"
+	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"market-dragon/internal/order"
 )
 
@@ -30,7 +33,6 @@ type createOrderResponse struct {
 
 // --- buy order request
 type buyOrderRequest struct {
-	OrderID string `json:"order_id"`
 	BuyerID string `json:"buyer_id"`
 }
 type buyOrderResponse struct {
@@ -43,7 +45,6 @@ type buyOrderResponse struct {
 
 // --- cancel order request
 type cancelOrderRequest struct {
-	OrderID  string `json:"order_id"`
 	SellerID string `json:"seller_id"`
 }
 
@@ -60,7 +61,8 @@ type OrderService interface {
 }
 
 type orderHandler struct {
-	svc OrderService
+	svc     OrderService
+	idemSvc *idempotency.IdempotencyService
 }
 
 // Create POST /orders
@@ -126,6 +128,11 @@ func (h *orderHandler) Buy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if key == "" {
+		http.Error(w, "Idempotency-Key header is required", http.StatusBadRequest)
+		return
+	}
 
 	var req buyOrderRequest
 	decoder := json.NewDecoder(r.Body)
@@ -140,7 +147,21 @@ func (h *orderHandler) Buy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.svc.Buy(r.Context(), req.OrderID, req.BuyerID)
+	orderID := chi.URLParam(r, "id")
+	req.BuyerID = strings.TrimSpace(req.BuyerID)
+	if orderID == "" || req.BuyerID == "" {
+		http.Error(w, "order ID and buyer ID are required", http.StatusBadRequest)
+		return
+	}
+	result, err := h.idemSvc.Execute(r.Context(), key, "order.buy",
+		idempotency.Hash(orderID, req.BuyerID),
+		func(ctx context.Context) (int, json.RawMessage, error) {
+			return http.StatusNoContent, nil, h.svc.Buy(ctx, orderID, req.BuyerID)
+		})
+	if errors.Is(err, idempotency.ErrKeyConflict) || errors.Is(err, idempotency.ErrNotCompleted) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	if errors.Is(err, order.ErrInvalidOrder) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -158,6 +179,10 @@ func (h *orderHandler) Buy(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to buy order", "error", err)
 		return
 	}
+	if result.Replayed {
+		w.Header().Set("Idempotency-Replayed", "true")
+	}
+	w.WriteHeader(result.StatusCode)
 }
 
 // Cancel DELETE /orders/{id}
@@ -183,7 +208,8 @@ func (h *orderHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.svc.Cancel(r.Context(), req.OrderID, req.SellerID)
+	orderID := chi.URLParam(r, "id")
+	err = h.svc.Cancel(r.Context(), orderID, req.SellerID)
 	if errors.Is(err, order.ErrInvalidOrder) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -198,6 +224,7 @@ func (h *orderHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	}
 	if errors.Is(err, order.ErrCancelOrderListedByAnother) {
 		http.Error(w, "cannot cancel order that is listed by another user", http.StatusBadRequest)
+		return
 	}
 	if err != nil {
 		http.Error(w, "failed to cancel order", http.StatusInternalServerError)
