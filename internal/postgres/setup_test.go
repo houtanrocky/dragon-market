@@ -77,6 +77,7 @@ func TestMain(m *testing.M) {
 		"000007_create_bids_table.up.sql",
 		"000008_restore_items_available.up.sql",
 		"000009_create_idempotency_records_table.up.sql",
+		"000010_add_wallet_audit_and_daily_date.up.sql",
 	}
 
 	for _, migFile := range migrations {
